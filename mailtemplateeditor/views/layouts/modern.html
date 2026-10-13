@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="[[lang]]" dir="[[dir]]" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<title>[[title]]</title>
+<style type="text/css">
+  body { margin:0; padding:0; background-color:[[page_bg]]; -webkit-text-size-adjust:100%; }
+  table { border-collapse:collapse; }
+  img { border:0; -ms-interpolation-mode:bicubic; }
+  .mte-content a { color:[[link_color]]; }
+  .mte-footer a { color:[[footer_text]]; }
+  @media only screen and (max-width: 640px) {
+    .mte-container { width:100% !important; }
+    .mte-pad { padding-left:20px !important; padding-right:20px !important; }
+    .mte-col { display:block !important; width:100% !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:[[page_bg]];">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">[[preheader]]</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:[[page_bg]];">
+  <tr>
+    <td style="background-color:[[accent]];height:6px;line-height:6px;font-size:6px;">&nbsp;</td>
+  </tr>
+  <tr>
+    <td align="center" style="padding:32px 12px 12px;">
+      <table role="presentation" class="mte-container" width="[[width]]" cellpadding="0" cellspacing="0" border="0" style="width:[[width]]px;max-width:[[width]]px;">
+        <!-- Header -->
+        <tr>
+          <td class="mte-pad" align="[[logo_align]]" style="padding:0 36px 24px;font-family:[[font]];color:[[header_text]];">
+            [[logo]]
+          </td>
+        </tr>
+        <!-- Card -->
+        <tr>
+          <td style="background-color:[[content_bg]];border-radius:[[radius]]px;border:1px solid [[border_color]];box-shadow:0 6px 24px rgba(17,24,39,0.08);">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="height:4px;line-height:4px;font-size:4px;background-color:[[accent]];border-radius:[[radius]]px [[radius]]px 0 0;">&nbsp;</td>
+              </tr>
+              <tr>
+                <td class="mte-pad mte-content" style="padding:36px 40px 28px;font-family:[[font]];font-size:[[font_size]]px;line-height:[[line_height]];color:[[text_color]];text-align:left;">
+                  [[content]]
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td class="mte-pad mte-footer" align="center" style="background-color:[[footer_bg]];padding:28px 36px 36px;font-family:[[font]];font-size:[[small_size]]px;line-height:1.6;color:[[footer_text]];">
+            <!--mte:if social--><div style="padding-bottom:14px;">[[social]]</div><!--mte:endif-->
+            <!--mte:if footer_columns-->[[footer_columns]]<!--mte:endif-->
+            <!--mte:if footer--><div style="padding:8px 0;">[[footer]]</div><!--mte:endif-->
+            <div style="padding-top:6px;">&copy; <a href="{shop_url}" style="color:[[footer_text]];text-decoration:none;">{shop_name}</a></div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>
