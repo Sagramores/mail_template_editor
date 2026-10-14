@@ -30,6 +30,15 @@ class MteContentExtractor
         }
         $xpath = new DOMXPath($doc);
 
+        // MJML gives the column widths through CSS classes in <head>: make them inline first.
+        foreach ($xpath->query('//*[contains(@class, "mj-column-")]') as $col) {
+            if (preg_match('/\bmj-column-(per|px)-([0-9]+(?:-[0-9]+)?)\b/', $col->getAttribute('class'), $m)) {
+                $width = str_replace('-', '.', $m[2]) . ($m[1] === 'per' ? '%' : 'px');
+                $style = preg_replace('/(^|;)\s*(max-width|width)\s*:[^;]*/i', '$1', $col->getAttribute('style'));
+                $col->setAttribute('style', self::cleanStyle($style . ';width:' . $width . ';max-width:' . $width));
+            }
+        }
+
         foreach (['//script', '//style', '//head', '//title', '//meta', '//link'] as $q) {
             self::removeAll($xpath->query($q));
         }
@@ -56,45 +65,52 @@ class MteContentExtractor
                 self::removeBlock($a, ['tr', 'p', 'div', 'table'], 'shop_url');
             }
         }
-        // Footer: "powered by PrestaShop" and the {shop_name} link row at the bottom.
+        // Footer: "powered by PrestaShop".
         foreach ($xpath->query('//text()[contains(translate(., "POWERED", "powered"), "powered by")]') as $node) {
             self::removeBlock($node, ['tr', 'div', 'p', 'table'], 'powered');
-        }
-        // Spacer-only elements (MJML output is full of them).
-        $nbsp = "\xC2\xA0";
-        $empty = 'normalize-space(translate(., "' . $nbsp . '", " ")) = "" and not(.//img) and not(.//a) and not(.//table) and not(.//hr)';
-        $spacers = [];
-        foreach ($xpath->query('//div[not(node()) or (' . $empty . ' and string-length(@style) > 0 and contains(@style, "height"))]') as $div) {
-            $spacers[] = $div;
-        }
-        foreach ($spacers as $div) {
-            if ($div->parentNode) {
-                $div->parentNode->removeChild($div);
-            }
-        }
-        // Sections left empty once their spacers are gone.
-        $spacers = [];
-        foreach ($xpath->query('//body/div[' . $empty . '] | //body/*/div[' . $empty . ' and not(ancestor::table)]') as $div) {
-            $spacers[] = $div;
-        }
-        foreach ($spacers as $div) {
-            if ($div->parentNode) {
-                $div->parentNode->removeChild($div);
-            }
         }
 
         $body = $doc->getElementsByTagName('body')->item(0);
         if (!$body) {
             return '';
         }
+        // The outer frame (page background, card, fixed width) comes from the design.
+        self::removeFrame($body);
+        foreach ($xpath->query('//*[contains(@style, "box-shadow") or contains(concat(" ", normalize-space(@class), " "), " wrapper-container ") or contains(concat(" ", normalize-space(@class), " "), " shadow ")]') as $el) {
+            self::stripFrameStyle($el);
+        }
+        // Wide fixed widths would overflow the design: full width instead.
+        foreach ($xpath->query('//*[@style]') as $el) {
+            $style = preg_replace_callback('/(^|;)(\s*)(width|min-width)\s*:\s*([0-9.]+)px/i', function ($m) {
+                return (float) $m[4] > 300 ? $m[1] . $m[2] . $m[3] . ':100%' : $m[0];
+            }, $el->getAttribute('style'));
+            $el->setAttribute('style', $style);
+        }
+        foreach ($xpath->query('//*[@width]') as $el) {
+            if ((int) $el->getAttribute('width') > 300 && $el->nodeName !== 'img') {
+                $el->setAttribute('width', '100%');
+            }
+        }
+        // MJML side gutters (cells with font-size:0 and padding, e.g. "padding:10px 25px"):
+        // the design gives the side margins, as the card does in the original e-mail.
+        foreach ($xpath->query('//*[@style and contains(translate(@style, " ", ""), "font-size:0px") and contains(@style, "padding")]') as $el) {
+            // Not inside a visible box: there the padding keeps the text off the border.
+            $inBox = false;
+            for ($up = $el->parentNode; $up instanceof DOMElement && $up->nodeName !== 'body'; $up = $up->parentNode) {
+                if (self::isVisualBox($up) && !self::isLightBackgroundOnly($up)) {
+                    $inBox = true;
+                    break;
+                }
+            }
+            if (!$inBox) {
+                $el->setAttribute('style', self::zeroSidePadding($el->getAttribute('style')));
+            }
+        }
+        // Spacing before the first and after the last content is given by the design.
+        self::trimEmptyEdges($xpath);
+
         if ($normalizeStyles) {
             self::normalize($xpath);
-        } else {
-            self::removeFrame($body);
-            // The card of the original layout (PrestaShop "modern"/"classic" mail themes).
-            foreach ($xpath->query('//*[contains(@style, "box-shadow") or contains(concat(" ", normalize-space(@class), " "), " wrapper-container ") or contains(concat(" ", normalize-space(@class), " "), " shadow ")]') as $el) {
-                self::stripFrameStyle($el);
-            }
         }
 
         $out = '';
@@ -268,30 +284,33 @@ class MteContentExtractor
     }
 
     /**
-     * Removes inline font/colour declarations so the selected design rules apply.
+     * For the module's designs: removes the fonts and text colours of the original
+     * e-mail so the design ones apply. Layout (widths, paddings, borders, spacing,
+     * font sizes) is kept exactly as in the original; sizes are scaled by the design.
      */
     protected static function normalize(DOMXPath $xpath)
     {
         foreach ($xpath->query('//*[@style]') as $el) {
-            $style = $el->getAttribute('style');
-            $style = preg_replace('/(^|;)\s*(font-family|font-size|line-height|color|background-color|background|background-image|border-color|letter-spacing|(?:-[a-z]+-)?box-shadow|filter)\s*:[^;]*/i', '$1', $style);
-            // Fixed pixel widths make the content overflow on phones.
-            $style = preg_replace('/(^|;)\s*(max-width|width|min-width)\s*:\s*[0-9.]+px[^;]*/i', '$1', $style);
-            $style = trim(preg_replace('/;{2,}/', ';', $style), "; \t\n");
+            $style = preg_replace('/(^|;)\s*(font-family|color|letter-spacing)\s*:[^;]*/i', '$1', $el->getAttribute('style'));
+            // Light backgrounds (boxes, tables) stay; strong colours belong to the old design.
+            $style = preg_replace_callback('/(^|;)\s*(background-color|background)\s*:([^;]*)/i', function ($m) {
+                return self::isLightColor($m[3]) ? $m[0] : $m[1];
+            }, $style);
+            $style = self::cleanStyle($style);
             if ($style === '') {
                 $el->removeAttribute('style');
             } else {
                 $el->setAttribute('style', $style);
             }
         }
-        foreach (['bgcolor', 'color', 'face', 'class'] as $attr) {
+        foreach (['color', 'face'] as $attr) {
             foreach ($xpath->query('//*[@' . $attr . ']') as $el) {
                 $el->removeAttribute($attr);
             }
         }
-        foreach ($xpath->query('//*[@width]') as $el) {
-            if ((int) $el->getAttribute('width') > 200 && $el->nodeName !== 'img') {
-                $el->setAttribute('width', '100%');
+        foreach ($xpath->query('//*[@bgcolor]') as $el) {
+            if (!self::isLightColor($el->getAttribute('bgcolor'))) {
+                $el->removeAttribute('bgcolor');
             }
         }
         // <font> tags carry nothing useful once attributes are gone: unwrap them.
@@ -304,6 +323,107 @@ class MteContentExtractor
                 $f->parentNode->insertBefore($f->firstChild, $f);
             }
             $f->parentNode->removeChild($f);
+        }
+    }
+
+    protected static function isLightColor($value)
+    {
+        $value = trim(strtolower((string) $value));
+        if (in_array($value, ['', 'transparent', 'none', 'white', '#fff', '#ffffff', 'inherit'], true)) {
+            return true;
+        }
+        if (preg_match('/#([0-9a-f]{3}|[0-9a-f]{6})\b/', $value, $m)) {
+            $hex = strlen($m[1]) === 3 ? $m[1][0] . $m[1][0] . $m[1][1] . $m[1][1] . $m[1][2] . $m[1][2] : $m[1];
+
+            return hexdec(substr($hex, 0, 2)) >= 0xE6 && hexdec(substr($hex, 2, 2)) >= 0xE6 && hexdec(substr($hex, 4, 2)) >= 0xE6;
+        }
+
+        return false;
+    }
+
+    /**
+     * "padding:10px 25px" -> "padding:10px 0" (vertical spacing kept).
+     */
+    protected static function zeroSidePadding($style)
+    {
+        $out = [];
+        foreach (explode(';', (string) $style) as $decl) {
+            $parts = explode(':', $decl, 2);
+            if (count($parts) !== 2) {
+                continue;
+            }
+            $prop = strtolower(trim($parts[0]));
+            $value = trim($parts[1]);
+            if ($prop === 'padding-left' || $prop === 'padding-right') {
+                continue;
+            }
+            if ($prop === 'padding') {
+                $v = preg_split('/\s+/', $value);
+                $top = $v[0];
+                $bottom = isset($v[2]) ? $v[2] : $top;
+                $value = $top . ' 0 ' . $bottom;
+            }
+            $out[] = $prop . ':' . $value;
+        }
+
+        return implode(';', $out);
+    }
+
+    public static function cleanStyle($style)
+    {
+        return trim(preg_replace('/\s*;[\s;]*/', ';', (string) $style), "; \t\n");
+    }
+
+    /**
+     * Removes empty spacer elements found before the first or after the last real content.
+     */
+    protected static function trimEmptyEdges(DOMXPath $xpath)
+    {
+        $isContent = function (DOMNode $n) {
+            if ($n instanceof DOMElement && in_array($n->nodeName, ['img', 'hr', 'input'], true)) {
+                return true;
+            }
+
+            return $n->nodeType === XML_TEXT_NODE && trim(str_replace("\xC2\xA0", ' ', $n->nodeValue)) !== ''
+                || $n->nodeType === XML_COMMENT_NODE;
+        };
+        foreach (['first', 'last'] as $edge) {
+            for ($i = 0; $i < 200; ++$i) {
+                $body = $xpath->query('//body')->item(0);
+                $node = $body;
+                // Walk down the first/last element children to the first/last leaf.
+                $removed = false;
+                while ($node) {
+                    $child = $edge === 'first' ? $node->firstChild : $node->lastChild;
+                    while ($child && $child->nodeType === XML_TEXT_NODE && trim(str_replace("\xC2\xA0", ' ', $child->nodeValue)) === '') {
+                        $child = $edge === 'first' ? $child->nextSibling : $child->previousSibling;
+                    }
+                    if (!$child) {
+                        break;
+                    }
+                    $hasContent = $isContent($child);
+                    if (!$hasContent && $child instanceof DOMElement) {
+                        foreach ($xpath->query('.//text()|.//img|.//hr|.//comment()', $child) as $n) {
+                            if ($isContent($n)) {
+                                $hasContent = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!$hasContent) {
+                        $child->parentNode->removeChild($child);
+                        $removed = true;
+                        break;
+                    }
+                    if (!$child instanceof DOMElement || in_array($child->nodeName, ['table', 'p', 'img', 'a', 'span', 'strong', 'b', 'ul', 'ol'], true)) {
+                        break;
+                    }
+                    $node = $child;
+                }
+                if (!$removed) {
+                    break;
+                }
+            }
         }
     }
 
@@ -332,10 +452,25 @@ class MteContentExtractor
                         $real[] = $cell;
                     }
                 }
-                if (count($real) !== 1) {
+                if (count($real) !== 1 || self::isVisualBox($table) || self::isVisualBox($rows->item(0)) || self::isVisualBox($real[0])) {
                     continue;
                 }
-                self::replaceWithChildren($table, $real[0]);
+                $cell = $real[0];
+                $keep = self::layoutStyle($cell->getAttribute('style'));
+                if ($cell->getAttribute('align') && strpos($keep, 'text-align') === false) {
+                    $keep = self::cleanStyle($keep . ';text-align:' . $cell->getAttribute('align'));
+                }
+                if ($keep === '') {
+                    self::replaceWithChildren($table, $cell);
+                } else {
+                    // The cell's padding/alignment give the spacing of the original: keep them on a div.
+                    $div = $doc->createElement('div');
+                    $div->setAttribute('style', $keep);
+                    while ($cell->firstChild) {
+                        $div->appendChild($cell->firstChild);
+                    }
+                    $table->parentNode->replaceChild($div, $table);
+                }
                 $changed = true;
                 break;
             }
@@ -360,6 +495,59 @@ class MteContentExtractor
         }
 
         return $html;
+    }
+
+    /**
+     * Borders or a background make a table/cell a visible box: never unwrap it.
+     */
+    protected static function isVisualBox(DOMNode $el)
+    {
+        if (!$el instanceof DOMElement) {
+            return false;
+        }
+        if ($el->hasAttribute('bgcolor') || ($el->hasAttribute('border') && (int) $el->getAttribute('border') > 0)) {
+            return true;
+        }
+        $style = strtolower($el->getAttribute('style'));
+        if (preg_match('/(^|;)\s*border(-top|-bottom|-left|-right)?\s*:\s*(?!0|none)[^;]+/', $style)) {
+            return true;
+        }
+
+        return (bool) preg_match('/(^|;)\s*background(-color)?\s*:\s*(?!transparent|none)[^;]+/', $style);
+    }
+
+    /**
+     * A background without border (e.g. the light band behind the products table) is not a box.
+     */
+    protected static function isLightBackgroundOnly(DOMElement $el)
+    {
+        $style = strtolower($el->getAttribute('style'));
+
+        return !preg_match('/(^|;)\s*border(-top|-bottom|-left|-right)?\s*:\s*(?!0|none)[^;]+/', $style)
+            && !($el->hasAttribute('border') && (int) $el->getAttribute('border') > 0);
+    }
+
+    /**
+     * Declarations of a layout cell worth keeping when it becomes a div.
+     */
+    protected static function layoutStyle($style)
+    {
+        $keep = [];
+        foreach (explode(';', (string) $style) as $decl) {
+            $parts = explode(':', $decl, 2);
+            if (count($parts) !== 2) {
+                continue;
+            }
+            $prop = strtolower(trim($parts[0]));
+            $value = trim($parts[1]);
+            if (preg_match('/^padding(-top|-bottom|-left|-right)?$/', $prop) && !preg_match('/^0(px)?(\s+0(px)?)*$/', $value)) {
+                $keep[] = $prop . ':' . $value;
+            } elseif (in_array($prop, ['text-align', 'direction', 'font-size', 'line-height', 'font-weight', 'color', 'font-family'], true)) {
+                $keep[] = $prop . ':' . $value;
+            }
+        }
+
+        return implode(';', $keep);
     }
 
     protected static function isSpacer(DOMNode $cell)

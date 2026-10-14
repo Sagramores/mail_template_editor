@@ -37,6 +37,7 @@ $_MODULE['<{mailtemplateeditor}prestashop>adminmailtemplateeditorcontroller_eeb6
 $_MODULE['<{mailtemplateeditor}prestashop>adminmailtemplateeditorcontroller_7dce122004969d56ae2e0245cb754d35'] = 'Επεξεργασία';
 $_MODULE['<{mailtemplateeditor}prestashop>adminmailtemplateeditorcontroller_f2a6c498fb90ee345d997f888fce3b18'] = 'Διαγραφή';
 $_MODULE['<{mailtemplateeditor}prestashop>adminmailtemplateeditorcontroller_12cba3ee81cf4a793796a51b6327c678'] = 'αντίγραφο';
+$_MODULE['<{mailtemplateeditor}prestashop>adminmailtemplateeditorcontroller_8f75b10eefe402a7b4e0846b5e4ee1d6'] = 'Κενό σχέδιο';
 $_MODULE['<{mailtemplateeditor}prestashop>adminmailtemplateeditorcontroller_7f97cdebef29e3ac0c4c541e76b9e020'] = 'Περιεχόμενο email';
 $_MODULE['<{mailtemplateeditor}prestashop>adminmailtemplateeditorcontroller_8c2857a9ad1d8f31659e35e904e20fa6'] = 'Λογότυπο';
 $_MODULE['<{mailtemplateeditor}prestashop>adminmailtemplateeditorcontroller_046e5210960d543b1ab01b8273812e01'] = 'Κοινωνικά δίκτυα';
@@ -75,8 +76,7 @@ $_MODULE['<{mailtemplateeditor}prestashop>main_8c7037e3f103d22c4bc757e95658e005'
 $_MODULE['<{mailtemplateeditor}prestashop>main_c04cc70886a309c2dfe418d7ca6f3c9e'] = 'Μόνο στα email που έχω προσαρμόσει';
 $_MODULE['<{mailtemplateeditor}prestashop>main_876a7f7595bfc1fe56c9175924cfe819'] = 'Όλα τα email (όσα δεν έχουν προσαρμοστεί χρησιμοποιούν το αρχικό τους περιεχόμενο)';
 $_MODULE['<{mailtemplateeditor}prestashop>main_7b5a20230f46bafc22195e95e1f3e0e4'] = 'Συμβουλή: ξεκινήστε με «Μόνο στα email που έχω προσαρμόσει» και χρησιμοποιήστε την «Εισαγωγή όλων των αρχικών» στην καρτέλα Περιεχόμενο email.';
-$_MODULE['<{mailtemplateeditor}prestashop>main_206b9653efa24036caf48e5e2877cd9f'] = 'Επεξεργασία αντιγράφου στον οπτικό builder';
-$_MODULE['<{mailtemplateeditor}prestashop>main_89f1613869f16fcb0c8cf12fd014130c'] = 'Νέο κενό σχέδιο';
+$_MODULE['<{mailtemplateeditor}prestashop>main_4894451f831fce8026cdc7f1be2990fb'] = 'Νέο σχέδιο';
 $_MODULE['<{mailtemplateeditor}prestashop>main_1637066a455847bc48da5cb20ac004d0'] = 'Κάθε σχέδιο κρατά τα δικά του χρώματα και μεγέθη. Η αλλαγή σχεδίου δεν χάνει τις αλλαγές σας.';
 $_MODULE['<{mailtemplateeditor}prestashop>main_7add294b8e0689fd134eba50e5f2c95f'] = 'Χρώματα';
 $_MODULE['<{mailtemplateeditor}prestashop>main_349d650bbc0a758c00b84fd056a06f94'] = 'Φόντο σελίδας';
@@ -136,8 +136,9 @@ $_MODULE['<{mailtemplateeditor}prestashop>main_87b7760f14fbff78d8819291f36ab9a0'
 $_MODULE['<{mailtemplateeditor}prestashop>main_3cfce651e667ab85486dd42a8185f98a'] = 'Πλαίσιο';
 $_MODULE['<{mailtemplateeditor}prestashop>main_b734f783592e48a08058ff8b99f60995'] = 'Διορθώνει χαλασμένο κείμενο όπως ÎšÎ±Î»Î·Î¼Î­ÏÎ± ξανά σε ελληνικά';
 $_MODULE['<{mailtemplateeditor}prestashop>main_eba200e70c4c37862904c438a9a74d73'] = 'Διόρθωση ελληνικών χαρακτήρων';
-$_MODULE['<{mailtemplateeditor}prestashop>main_12afa30fb9ab132765d6f6810252dbe7'] = 'Οπτικός builder';
-$_MODULE['<{mailtemplateeditor}prestashop>main_73af2c58f07f2eb07343b6bed68440d4'] = 'Κώδικας HTML';
+$_MODULE['<{mailtemplateeditor}prestashop>main_e268e5e985f830175ff2cc379c2318b1'] = 'Επεξεργασία μέσα στο σχέδιο, όπως θα το δει ο πελάτης';
+$_MODULE['<{mailtemplateeditor}prestashop>main_4557e77491fe3dbd9a6055aeb0ed00d7'] = 'Οπτικά';
+$_MODULE['<{mailtemplateeditor}prestashop>main_c829d331254b91726d2035ad5767e611'] = 'Μόνο η περιοχή με το διακεκομμένο πλαίσιο είναι το περιεχόμενο αυτού του email· τα υπόλοιπα είναι το σχέδιο. Σύρετε στοιχεία από δεξιά, κάντε κλικ σε ένα κείμενο για να το αλλάξετε.';
 $_MODULE['<{mailtemplateeditor}prestashop>main_f7cf6280fc842f3980998b878c958d79'] = 'Μεταβλητές αυτού του email (κλικ για εισαγωγή)';
 $_MODULE['<{mailtemplateeditor}prestashop>main_c9cc8cce247e49bae79f15173ce97354'] = 'Αποθήκευση';
 $_MODULE['<{mailtemplateeditor}prestashop>main_31fde7b05ac8952dacf4af8a704074ec'] = 'Προεπισκόπηση';
@@ -149,6 +150,9 @@ $_MODULE['<{mailtemplateeditor}prestashop>main_91f3a2c0e4424c87689525da44c4db11'
 $_MODULE['<{mailtemplateeditor}prestashop>main_a4bb0d00d35e3590e8e8d013ce5f6e98'] = 'Επιλέξτε ένα αρχείο από τη λίστα.';
 $_MODULE['<{mailtemplateeditor}prestashop>main_35d29613e7c8ecabf12dfa188ab862f8'] = 'Αποθήκευση αρχείου';
 $_MODULE['<{mailtemplateeditor}prestashop>main_1414cdc093d39dd56d0b0d20049e17fc'] = 'Αντίγραφα ασφαλείας';
+$_MODULE['<{mailtemplateeditor}prestashop>main_7f851e45f01fc40b07ef2647480a52f2'] = 'Ξεκινήστε από:';
+$_MODULE['<{mailtemplateeditor}prestashop>main_ea4788705e6873b424c65e91c2846b19'] = 'Ακύρωση';
+$_MODULE['<{mailtemplateeditor}prestashop>main_12afa30fb9ab132765d6f6810252dbe7'] = 'Οπτικός builder';
 $_MODULE['<{mailtemplateeditor}prestashop>main_17e008e9d5c5f015d395870a72c69fcd'] = 'Όνομα σχεδίου';
 $_MODULE['<{mailtemplateeditor}prestashop>main_fa7de4af26460d90c835ce749b4df184'] = 'Προεπισκόπηση με email';
 $_MODULE['<{mailtemplateeditor}prestashop>main_d3d2e617335f08df83599665eef8a418'] = 'Κλείσιμο';

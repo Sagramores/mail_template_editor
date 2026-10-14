@@ -33,8 +33,7 @@
             <div class="panel-heading"><i class="icon-th-large"></i> {l s='Design' mod='mailtemplateeditor'}</div>
             <div class="mte-layouts" id="mte-layouts"></div>
             <div class="mte-layout-actions">
-              <button type="button" class="btn btn-default btn-sm" id="mte-builder-copy"><i class="icon-copy"></i> {l s='Edit a copy in the visual builder' mod='mailtemplateeditor'}</button>
-              <button type="button" class="btn btn-default btn-sm" id="mte-builder-new"><i class="icon-plus"></i> {l s='New empty design' mod='mailtemplateeditor'}</button>
+              <button type="button" class="btn btn-default btn-sm" id="mte-builder-new"><i class="icon-plus"></i> {l s='New design' mod='mailtemplateeditor'}</button>
             </div>
             <p class="help-block">{l s='Each design keeps its own colours and sizes. Switching design does not lose your changes.' mod='mailtemplateeditor'}</p>
           </div>
@@ -189,10 +188,17 @@
                 <button type="button" class="btn btn-default btn-sm" id="mte-insert-button"><i class="icon-hand-o-up"></i> {l s='Button' mod='mailtemplateeditor'}</button>
                 <button type="button" class="btn btn-default btn-sm" id="mte-insert-box"><i class="icon-square-o"></i> {l s='Box' mod='mailtemplateeditor'}</button>
                 <button type="button" class="btn btn-default btn-sm" id="mte-repair" title="{l s='Fixes broken text such as ÎšÎ±Î»Î·Î¼Î­ÏÎ± back into Greek' mod='mailtemplateeditor'}"><i class="icon-magic"></i> {l s='Repair Greek characters' mod='mailtemplateeditor'}</button>
-                <button type="button" class="btn btn-default btn-sm" id="mte-content-builder"><i class="icon-th-large"></i> {l s='Visual builder' mod='mailtemplateeditor'}</button>
-                <button type="button" class="btn btn-default btn-sm" id="mte-toggle-source"><i class="icon-code"></i> <span>{l s='HTML source' mod='mailtemplateeditor'}</span></button>
+                <span class="mte-seg mte-seg-inline mte-mode-switch" role="group">
+                  <button type="button" class="mte-seg-btn" data-mte-mode="visual" title="{l s='Edit inside the design, as the customer will see it' mod='mailtemplateeditor'}"><i class="icon-th-large"></i> {l s='Visual' mod='mailtemplateeditor'}</button>
+                  <button type="button" class="mte-seg-btn" data-mte-mode="text"><i class="icon-font"></i> {l s='Text' mod='mailtemplateeditor'}</button>
+                  <button type="button" class="mte-seg-btn" data-mte-mode="html"><i class="icon-code"></i> HTML</button>
+                </span>
               </div>
 
+              <div id="mte-visual" class="mte-visual" hidden>
+                <p class="mte-visual-hint"><i class="icon-info-circle"></i> {l s='Only the area with the dashed frame is the content of this e-mail; the rest is the design. Drag blocks from the right, click a text to edit it.' mod='mailtemplateeditor'}</p>
+                <div class="mte-visual-editor"><div id="mte-visual-gjs"></div></div>
+              </div>
               <textarea id="mte-editor" class="form-control mte-code" rows="22"></textarea>
 
               <div class="mte-vars">
@@ -256,6 +262,18 @@
   </div>
 
   <div id="mte-toast" class="mte-toast"></div>
+
+  {* ============================== NEW DESIGN ============================== *}
+  <div id="mte-new-design" class="mte-modal" hidden>
+    <div class="mte-modal-box" role="dialog" aria-labelledby="mte-new-design-title">
+      <h3 id="mte-new-design-title"><i class="icon-plus"></i> {l s='New design' mod='mailtemplateeditor'}</h3>
+      <p>{l s='Start from:' mod='mailtemplateeditor'}</p>
+      <div class="mte-layouts" id="mte-start-options"></div>
+      <div class="mte-modal-actions">
+        <button type="button" class="btn btn-default" id="mte-new-design-cancel">{l s='Cancel' mod='mailtemplateeditor'}</button>
+      </div>
+    </div>
+  </div>
 
   {* ============================== VISUAL BUILDER ============================== *}
   <div id="mte-builder" class="mte-builder" hidden>

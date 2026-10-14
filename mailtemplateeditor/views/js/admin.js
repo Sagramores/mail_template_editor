@@ -29,7 +29,6 @@
       files: [],
       currentFile: null,
       editor: null,
-      sourceMode: false
     };
 
     /* ---------------- helpers ---------------- */
@@ -294,15 +293,14 @@
 
     function initEditor() {
       if (!cfg.tinymce || typeof window.tinymce === 'undefined') {
-        state.sourceMode = true;
-        $('#mte-toggle-source').hide();
+        $('[data-mte-mode="text"]').hide();
         return $.Deferred().resolve().promise();
       }
       var d = $.Deferred();
       var s = state.settings[state.layout];
       window.tinymce.init({
         selector: '#mte-editor',
-        height: 480,
+        height: 700,
         menubar: false,
         branding: false,
         skin: cfg.tinymceSkin,
@@ -330,8 +328,25 @@
       return d.promise();
     }
 
+    /*
+     * Three ways to edit the same content:
+     *  visual: inside the design, as the customer will see it (GrapesJS, only the content is editable)
+     *  text:   TinyMCE
+     *  html:   source code
+     */
+    state.mode = (function () {
+      try {
+        return window.localStorage.getItem('mte_mode') || 'visual';
+      } catch (e) {
+        return 'visual';
+      }
+    })();
+
     function getContent() {
-      if (state.editor && !state.sourceMode) {
+      if (state.mode === 'visual' && visual.ready) {
+        return visualGetContent();
+      }
+      if (state.mode === 'text' && state.editor) {
         return state.editor.getContent();
       }
       return $('#mte-editor').val();
@@ -339,13 +354,50 @@
 
     function setContent(html) {
       $('#mte-editor').val(html);
-      if (state.editor && !state.sourceMode) {
+      if (state.mode === 'text' && state.editor) {
         state.editor.setContent(html);
+      } else if (state.mode === 'visual') {
+        visualLoad(html);
       }
     }
 
+    function applyMode(mode, html) {
+      if (mode === 'text' && !state.editor) {
+        mode = 'html';
+      }
+      if (mode === 'visual' && !cfg.builder) {
+        mode = 'text';
+      }
+      state.mode = mode;
+      try {
+        window.localStorage.setItem('mte_mode', mode);
+      } catch (e) {}
+      $('[data-mte-mode]').removeClass('active').filter('[data-mte-mode="' + mode + '"]').addClass('active');
+      $('#mte-visual').prop('hidden', mode !== 'visual');
+      $('#mte-insert-button, #mte-insert-box').toggle(mode !== 'visual');
+      if (state.editor) {
+        if (mode === 'text') {
+          state.editor.show();
+        } else {
+          state.editor.hide();
+        }
+      }
+      $('#mte-editor').toggle(mode === 'html');
+      setContent(html);
+    }
+
+    $('[data-mte-mode]').on('click', function () {
+      var mode = $(this).data('mte-mode');
+      if (mode === state.mode) {
+        return;
+      }
+      applyMode(mode, getContent());
+    });
+
     function insertHtml(html) {
-      if (state.editor && !state.sourceMode) {
+      if (state.mode === 'visual' && visual.ready) {
+        visualInsert(html);
+      } else if (state.mode === 'text' && state.editor) {
         state.editor.insertContent(html);
       } else {
         var el = document.getElementById('mte-editor');
@@ -357,22 +409,6 @@
       state.dirty = true;
     }
 
-    $('#mte-toggle-source').on('click', function () {
-      if (!state.editor) {
-        return;
-      }
-      if (state.sourceMode) {
-        state.editor.show();
-        state.editor.setContent($('#mte-editor').val());
-        state.sourceMode = false;
-        $(this).find('span').text(t.source);
-      } else {
-        $('#mte-editor').val(state.editor.getContent());
-        state.editor.hide();
-        state.sourceMode = true;
-        $(this).find('span').text(t.visual);
-      }
-    });
     $('#mte-editor').on('input', function () { state.dirty = true; });
 
     function loadTemplates() {
@@ -586,7 +622,10 @@
         return;
       }
       contentInit = true;
-      initEditor().then(loadTemplates);
+      initEditor().then(function () {
+        applyMode(state.mode, $('#mte-editor').val());
+        loadTemplates();
+      });
     });
 
     /* ---------------- FILES TAB ---------------- */
@@ -749,7 +788,7 @@
       return '<div data-mte-token="' + name + '">[[' + name + ']]</div>';
     }
 
-    function setupEditor() {
+    function setupEditor(container) {
       var preset = window['grapesjs-preset-newsletter'];
       preset = preset && preset.default ? preset.default : preset;
       var messages = {};
@@ -757,7 +796,7 @@
         messages.el = window.mteGrapesLocaleEl;
       }
       var editor = window.grapesjs.init({
-        container: '#mte-gjs',
+        container: container,
         height: '100%',
         width: 'auto',
         fromElement: false,
@@ -838,7 +877,7 @@
       $('body').addClass('mte-builder-open');
       return loadBuilderAssets().then(function () {
         if (!builder.editor) {
-          builder.editor = setupEditor();
+          builder.editor = setupEditor('#mte-gjs');
         }
         var ed = builder.editor;
         // Design-only blocks are hidden when editing the content of one e-mail.
@@ -945,17 +984,40 @@
       });
     }
 
-    $('#mte-builder-copy').on('click', function () {
-      if (isCustom(state.layout)) {
-        api('loadLayout', { id_layout: state.layout.substr(7) }).then(function (res) {
-          openBuilder({ mode: 'layout', html: res.html, project: res.project, name: res.name + ' (2)', layoutId: 0 });
-        });
-        return;
-      }
-      startLayoutBuilder(state.layout, layoutName(state.layout) + ' (' + t.copy + ')');
+    // "New design": choose the starting point (empty, a built-in design or a copy of one of yours).
+    function openNewDesign() {
+      var $box = $('#mte-start-options').empty();
+      var options = [{ key: 'blank', name: t.emptyDesign, thumb: 'custom' }];
+      ['prestashop', 'classic', 'modern', 'minimal'].forEach(function (key) {
+        options.push({ key: key, name: layoutName(key), thumb: key });
+      });
+      cfg.customLayouts.forEach(function (l) {
+        options.push({ key: l.key, name: l.name, thumb: 'custom' });
+      });
+      options.forEach(function (o) {
+        var $card = $('<div class="mte-layout-card" role="button" tabindex="0">').attr('data-start', o.key);
+        $card.append('<span class="mte-thumb mte-thumb-' + o.thumb + '"><i></i><b></b><em></em><em></em><u></u></span>');
+        $card.append($('<span class="mte-layout-name">').text(o.name));
+        $box.append($card);
+      });
+      $('#mte-new-design').prop('hidden', false);
+    }
+    $('#mte-builder-new').on('click', openNewDesign);
+    $('#mte-new-design-cancel').on('click', function () {
+      $('#mte-new-design').prop('hidden', true);
     });
-    $('#mte-builder-new').on('click', function () {
-      startLayoutBuilder('blank', '');
+    $('#mte-start-options').on('click keypress', '[data-start]', function () {
+      var from = $(this).data('start');
+      $('#mte-new-design').prop('hidden', true);
+      if (from === 'blank') {
+        startLayoutBuilder('blank', '');
+      } else if (isCustom(from)) {
+        api('loadLayout', { id_layout: from.substr(7) }).then(function (res) {
+          openBuilder({ mode: 'layout', html: res.html, project: res.project, name: res.name + ' (' + t.copy + ')', layoutId: 0 });
+        });
+      } else {
+        startLayoutBuilder(from, layoutName(from) + ' (' + t.copy + ')');
+      }
     });
     $('#mte-layouts').on('click', '[data-mte-edit-layout]', function () {
       var key = $(this).data('mte-edit-layout');
@@ -980,19 +1042,135 @@
       });
     });
 
-    // Content of one e-mail in the builder.
-    $('#mte-content-builder').on('click', function () {
-      if (!state.current) {
-        return;
+    /* ---------------- VISUAL MODE OF "E-MAIL CONTENTS" ---------------- */
+
+    var visual = { editor: null, loaded: false, ready: false, loading: false, canvas: {}, pending: null, fillNext: null };
+
+    var lockedProps = {
+      selectable: false, hoverable: false, editable: false, draggable: false, droppable: false,
+      removable: false, copyable: false, badgable: false, layerable: false, highlightable: false
+    };
+
+    function isInside(component, ancestor) {
+      for (var c = component; c; c = c.parent()) {
+        if (c === ancestor) {
+          return true;
+        }
       }
-      openBuilder({
-        mode: 'content',
-        html: getContent(),
-        onSave: function (html) {
-          setContent(html);
-          state.dirty = true;
+      return false;
+    }
+
+    function visualRegion() {
+      return visual.editor ? visual.editor.getWrapper().find('[data-mte-region]')[0] : null;
+    }
+
+    function visualCanvas(idLang) {
+      if (visual.canvas[idLang]) {
+        return $.Deferred().resolve(visual.canvas[idLang]).promise();
+      }
+      return api('contentCanvas', { id_lang: idLang }).then(function (res) {
+        visual.canvas[idLang] = res;
+        return res;
+      });
+    }
+
+    function visualStyles(canvas) {
+      var doc = visual.editor.Canvas.getDocument();
+      var el = doc.getElementById('mte-design-css');
+      if (!el) {
+        el = doc.createElement('style');
+        el.id = 'mte-design-css';
+        doc.head.appendChild(el);
+      }
+      el.textContent = canvas.css
+        + 'body{' + (canvas.bodyStyle || '') + '}'
+        + '[data-mte-region]{outline:2px dashed rgba(37,185,215,.7);outline-offset:6px;min-height:60px;}'
+        + '[data-mte-region]:empty::before{content:"' + t.blockContent.replace(/"/g, '') + '";display:block;padding:20px;text-align:center;color:#25b9d7;}';
+    }
+
+    function visualLoad(html) {
+      visual.ready = false;
+      visual.pending = html;
+      var idLang = state.contentLang;
+      $.when(loadBuilderAssets(), visualCanvas(idLang)).then(function (x, canvas) {
+        if (visual.pending !== html || state.mode !== 'visual') {
+          return;
+        }
+        var first = !visual.editor;
+        if (first) {
+          visual.editor = setupEditor('#mte-visual-gjs');
+          // Design-only blocks make no sense inside the content of one e-mail.
+          ['mte-content', 'mte-logo', 'mte-social', 'mte-footer', 'mte-columns'].forEach(function (id) {
+            visual.editor.BlockManager.remove(id);
+          });
+          visual.editor.on('load', function () {
+            visual.loaded = true;
+            if (visual.fillNext) {
+              visual.fillNext();
+            }
+          });
+          visual.editor.on('component:add component:remove component:update', function () {
+            if (visual.ready && !visual.loading) {
+              state.dirty = true;
+            }
+          });
+        }
+        var ed = visual.editor;
+        var fill = function () {
+          visual.loading = true;
+          ed.setStyle('');
+          ed.setComponents(canvas.html.split('[[mte_region]]').join(html || ''));
+          var region = visualRegion();
+          var wrapper = ed.getWrapper();
+          wrapper.set({ droppable: false });
+          wrapper.find('*').forEach(function (c) {
+            if (!region || !isInside(c, region)) {
+              c.set(lockedProps);
+            }
+          });
+          if (region) {
+            region.set({ removable: false, draggable: false, copyable: false, droppable: true, selectable: true, hoverable: true, layerable: true });
+          }
+          visualStyles(canvas);
+          visual.fillNext = null;
+          visual.ready = true;
+          setTimeout(function () { visual.loading = false; }, 300);
+        };
+        visual.fillNext = fill;
+        if (visual.loaded) {
+          fill();
         }
       });
+    }
+
+    function visualGetContent() {
+      var ed = visual.editor;
+      var html = ed.runCommand('gjs-get-inlined-html') || ed.getHtml();
+      var doc = new window.DOMParser().parseFromString(html, 'text/html');
+      var region = doc.querySelector('[data-mte-region]');
+      var out = region ? region.innerHTML : '';
+      // Ids added by the builder for its own styling.
+      return out.replace(/\sid="i[a-z0-9]{2,8}(-\d+)*"/g, '');
+    }
+
+    function visualInsert(html) {
+      var ed = visual.editor;
+      var region = visualRegion();
+      if (ed.getEditing && ed.getEditing()) {
+        ed.Canvas.getDocument().execCommand('insertHTML', false, html);
+        return;
+      }
+      var sel = ed.getSelected();
+      if (sel && sel !== region && region && isInside(sel, region) && sel.parent()) {
+        sel.parent().append(html, { at: sel.index() + 1 });
+      } else if (region) {
+        region.append(html);
+      }
+    }
+
+    // A new design or language changes the canvas.
+    $('#mte-save-design').on('click', function () {
+      visual.canvas = {};
     });
 
     if (!cfg.canEdit) {

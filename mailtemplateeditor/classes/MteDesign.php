@@ -18,6 +18,9 @@ class MteDesign
     /** Tokens that become drop-in blocks in the visual builder. */
     const BLOCK_TOKENS = ['content', 'logo', 'social', 'footer', 'footer_columns'];
 
+    /** Text size PrestaShop e-mails are designed for. */
+    const BASE_FONT_SIZE = 14;
+
     const SOCIAL = ['facebook' => 'Facebook', 'instagram' => 'Instagram', 'x' => 'X', 'youtube' => 'YouTube', 'tiktok' => 'TikTok', 'linkedin' => 'LinkedIn', 'pinterest' => 'Pinterest'];
 
     const FONTS = [
@@ -263,6 +266,8 @@ class MteDesign
             'heading_transform' => $s['uppercase_headings'] ? 'uppercase' : 'none',
             'radius_small' => (string) min((int) $s['radius'], 8),
             'width_inner' => (string) ((int) $s['width'] - 2),
+            // Same web font as the PrestaShop e-mails (clients without web fonts use Arial).
+            'font_import' => $s['font_family'] === 'opensans' ? '@import url(https://fonts.googleapis.com/css?family=Open+Sans:400,600,700);' : '',
         ];
         foreach ($s as $key => $value) {
             if (!isset($tokens[$key])) {
@@ -326,14 +331,10 @@ class MteDesign
     }
 
     /**
-     * Adds inline styles to the content tags (many e-mail clients ignore <style>).
-     * Styles already present on an element win.
+     * Styles the design gives to the content elements: [tag rules, button, box].
      */
-    public static function styleContent($html, array $s, $font)
+    public static function contentRules(array $s, $font)
     {
-        if (trim((string) $html) === '') {
-            return '';
-        }
         $transform = $s['uppercase_headings'] ? 'text-transform:uppercase;' : '';
         $rules = [
             'h1' => 'margin:0 0 16px;font-family:' . $font . ';font-size:' . $s['heading_size'] . 'px;line-height:1.3;color:' . $s['heading_color'] . ';font-weight:bold;' . $transform,
@@ -349,11 +350,50 @@ class MteDesign
         $button = 'display:inline-block;padding:12px 26px;background-color:' . $s['button_bg'] . ';color:' . $s['button_text'] . ';border-radius:' . min(30, $s['radius'] + 2) . 'px;font-family:' . $font . ';font-size:' . $s['font_size'] . 'px;font-weight:bold;text-decoration:none;';
         $box = 'padding:16px 18px;margin:0 0 16px;border:1px solid ' . $s['border_color'] . ';border-radius:' . $s['radius'] . 'px;background-color:' . $s['content_bg'] . ';';
 
+
+        return [$rules, $button, $box];
+    }
+
+    /**
+     * The same rules as CSS, for the visual editor (inline styles of the content win, as in the e-mail).
+     */
+    public static function contentCss(array $s, $scope)
+    {
+        $font = isset(self::FONTS[$s['font_family']]) ? self::FONTS[$s['font_family']] : self::FONTS['arial'];
+        list($rules, $button, $box) = self::contentRules($s, $font);
+        $css = $scope . '{font-family:' . $font . ';font-size:' . (int) $s['font_size'] . 'px;line-height:' . $s['line_height'] . ';color:' . $s['text_color'] . ';}';
+        foreach ($rules as $tag => $rule) {
+            $css .= $scope . ' ' . $tag . '{' . $rule . '}';
+        }
+        $css .= $scope . ' .mte-button{' . $button . '}' . $scope . ' .mte-box{' . $box . '}';
+
+        return $css;
+    }
+
+    /**
+     * Adds inline styles to the content tags (many e-mail clients ignore <style>).
+     * Styles already present on an element win.
+     */
+    public static function styleContent($html, array $s, $font)
+    {
+        if (trim((string) $html) === '') {
+            return '';
+        }
+        list($rules, $button, $box) = self::contentRules($s, $font);
+
         $doc = MteContentExtractor::load($html);
         if (!$doc) {
             return $html;
         }
         $xpath = new DOMXPath($doc);
+        // The text size of the design scales every size of the e-mail (PrestaShop e-mails
+        // are made for 14px), so headings and small print keep their proportions.
+        $factor = (float) $s['font_size'] / self::BASE_FONT_SIZE;
+        if (abs($factor - 1) > 0.001) {
+            foreach ($xpath->query('//body//*[@style]') as $el) {
+                $el->setAttribute('style', self::scaleSizes($el->getAttribute('style'), $factor));
+            }
+        }
         // Component classes first, so their colours win over the generic tag rules below.
         foreach ($xpath->query('//body//*[contains(concat(" ", normalize-space(@class), " "), " mte-button ")]') as $el) {
             $el->setAttribute('style', self::mergeStyle($button, $el->getAttribute('style')));
@@ -375,6 +415,16 @@ class MteDesign
         }
 
         return MteContentExtractor::fixVariables($out);
+    }
+
+    /**
+     * Multiplies the px font sizes and line heights of a style attribute.
+     */
+    public static function scaleSizes($style, $factor)
+    {
+        return preg_replace_callback('/(^|;)(\s*)(font-size|line-height)(\s*:\s*)([0-9.]+)px/i', function ($m) use ($factor) {
+            return $m[1] . $m[2] . $m[3] . $m[4] . round((float) $m[5] * $factor) . 'px';
+        }, (string) $style);
     }
 
     /**

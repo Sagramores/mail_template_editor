@@ -6,15 +6,22 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 <title>[[title]]</title>
 <style type="text/css">
+  [[font_import]]
   body { margin:0; padding:0; background-color:[[page_bg]]; -webkit-text-size-adjust:100%; }
   table { border-collapse:collapse; }
   img { border:0; -ms-interpolation-mode:bicubic; }
   .mte-content a { color:[[link_color]]; }
+  /* Rows of {products} / {discounts} (added by PrestaShop when sending). */
+  .mte-content .products-table td, .mte-content .products-table th { font-size:[[small_size]]px; }
   .mte-footer a { color:[[footer_text]]; }
   @media only screen and (max-width: 640px) {
     .mte-container { width:100% !important; }
     .mte-pad { padding-left:16px !important; padding-right:16px !important; }
     .mte-col { display:block !important; width:100% !important; }
+    /* Same mobile rules as the PrestaShop e-mails, for their imported content. */
+    .mte-content [class*="mj-column-per"] { width:100% !important; max-width:100% !important; }
+    .mte-content .box { display:block !important; width:100% !important; }
+    .mte-content .space { display:none !important; }
   }
 </style>
 </head>

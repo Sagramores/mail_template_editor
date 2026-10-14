@@ -147,6 +147,7 @@ class AdminMailTemplateEditorController extends ModuleAdminController
             'edit' => $this->t('Edit'),
             'delete' => $this->t('Delete'),
             'copy' => $this->t('copy'),
+            'emptyDesign' => $this->t('Empty design'),
             'blockContent' => $this->t('E-mail content'),
             'blockLogo' => $this->t('Logo'),
             'blockSocial' => $this->t('Social networks'),
@@ -492,6 +493,28 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         $logo = $this->logoUrl();
 
         return $logo !== '' ? str_replace('{shop_logo}', $logo, $html) : $html;
+    }
+
+    /**
+     * The e-mail as it will look (current design, sample shop data) with an editable
+     * region where the content goes: used by the visual mode of "E-mail contents".
+     */
+    public function ajaxProcessContentCanvas()
+    {
+        $idLang = (int) Tools::getValue('id_lang') ?: (int) $this->context->language->id;
+        $layout = $this->module->getLayout();
+        $marker = '[[mte_region]]';
+        $html = $this->module->renderEmail('<div data-mte-region="content">' . $marker . '</div>', $idLang);
+        $html = $this->fillPreviewVars($html, $idLang);
+        $css = '';
+        if (preg_match_all('#<style[^>]*>(.*?)</style>#is', $html, $m)) {
+            $css = implode("\n", $m[1]);
+        }
+        $body = preg_match('#<body[^>]*>(.*)</body>#is', $html, $m) ? $m[1] : $html;
+        $bodyStyle = preg_match('#<body[^>]*style="([^"]*)"#i', $html, $m) ? $m[1] : '';
+        $settings = $this->module->getAllSettings();
+        $css .= "\n" . MteDesign::contentCss(isset($settings[$layout]) ? $settings[$layout] : MteDesign::defaults($layout), '[data-mte-region]');
+        $this->json(['html' => $body, 'css' => $css, 'bodyStyle' => $bodyStyle, 'layout' => $layout]);
     }
 
     public function ajaxProcessLoadLayout()

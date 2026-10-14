@@ -66,6 +66,13 @@ check('ps8: products protected inside table', (bool) preg_match('/<\/tr>\s*<!--m
 check('ps8: logo/footer removed', strpos($out, '{shop_logo}') === false && stripos($out, 'powered by') === false);
 check('ps8: no fixed fonts', stripos($out, 'Open sans') === false);
 $full = MteDesign::render('modern', MteDesign::defaults('modern'), $out, ['logo' => true]);
+check('ps8: address boxes keep their width', substr_count($out, 'width: 244px') + substr_count($out, 'width:244px') >= 2, $out);
+check('ps8: bordered boxes kept', substr_count(strtolower($out), 'border: 1px solid #dfdfdf') + substr_count(strtolower($out), 'border:1px solid #dfdfdf') >= 2);
+check('ps8: no MJML side gutter outside boxes', strpos($out, 'padding: 10px 25px; word-break') === false || preg_match('/border[^"]*"[^>]*>\s*<tr>\s*<td[^>]*padding: 10px 25px/', $out));
+$scaled = MteDesign::styleContent('<div style="font-size:20px;line-height:25px">x</div><p style="font-size:0px">y</p>', MteDesign::sanitize('modern', ['font_size' => 16]), 'Arial');
+check('design: sizes scaled from 14px', strpos($scaled, 'font-size:23px') !== false && strpos($scaled, 'line-height:29px') !== false && strpos($scaled, 'font-size:0px') !== false, $scaled);
+$css = MteDesign::contentCss(MteDesign::defaults('modern'), '[data-mte-region]');
+check('design: content css for the visual editor', strpos($css, '[data-mte-region] a{color:#4f46e5;}') !== false && strpos($css, '.mte-button{') !== false, $css);
 check('ps8: products restored on render', (bool) preg_match('/<\/tr>\s*\{products\}\s*\{discounts\}\s*<tr/', $full));
 check('ps8: txt restores vars', strpos(MteDesign::toText($out), '{products_txt}') !== false);
 $out = MteContentExtractor::extract(file_get_contents($fx . 'ps8_account.html'));

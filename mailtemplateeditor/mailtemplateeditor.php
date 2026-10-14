@@ -41,8 +41,8 @@ class MailTemplateEditor extends Module
     {
         $this->name = 'mailtemplateeditor';
         $this->tab = 'emailing';
-        $this->version = '1.1.0';
-        $this->author = 'sagramores';
+        $this->version = '1.2.0';
+        $this->author = 'Sotiris Betsos';
         $this->need_instance = 0;
         $this->bootstrap = true;
         $this->ps_versions_compliancy = ['min' => '1.7.0.0', 'max' => '9.99.99'];
