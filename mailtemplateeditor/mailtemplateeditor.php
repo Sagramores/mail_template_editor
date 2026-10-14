@@ -41,7 +41,7 @@ class MailTemplateEditor extends Module
     {
         $this->name = 'mailtemplateeditor';
         $this->tab = 'emailing';
-        $this->version = '1.0.0';
+        $this->version = '1.1.0';
         $this->author = 'sagramores';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -81,7 +81,7 @@ class MailTemplateEditor extends Module
         }
 
         return Configuration::updateValue('MTE_MODE', self::MODE_CUSTOM)
-            && Configuration::updateValue('MTE_LAYOUT', 'modern')
+            && Configuration::updateValue('MTE_LAYOUT', 'prestashop')
             && Configuration::updateValue('MTE_SETTINGS', json_encode($settings), true)
             && Configuration::updateValue('MTE_SOCIAL', json_encode([]), true)
             && Configuration::updateValue('MTE_SKIP', '', true);
@@ -126,22 +126,58 @@ class MailTemplateEditor extends Module
      * Settings helpers (also used by the admin controller)
      * ------------------------------------------------------------------ */
 
-    public function getLayout()
+    public function getLayout($idShop = null)
     {
-        $layout = (string) Configuration::get('MTE_LAYOUT');
+        $layout = (string) Configuration::get('MTE_LAYOUT', null, null, $idShop);
+        if (MteDesign::isCustom($layout)) {
+            return $this->getCustomLayoutHtml($layout, $idShop) !== '' ? $layout : 'modern';
+        }
 
         return in_array($layout, MteDesign::LAYOUTS, true) ? $layout : 'modern';
     }
 
-    public function getAllSettings()
+    /**
+     * Settings of every design: the built-in ones and the custom ones.
+     */
+    public function getAllSettings($idShop = null)
     {
-        $stored = json_decode((string) Configuration::get('MTE_SETTINGS'), true);
+        $stored = json_decode((string) Configuration::get('MTE_SETTINGS', null, null, $idShop), true);
+        $layouts = MteDesign::LAYOUTS;
+        foreach ($this->getCustomLayouts($idShop) as $row) {
+            $layouts[] = 'custom_' . (int) $row['id_mte_layout'];
+        }
         $out = [];
-        foreach (MteDesign::LAYOUTS as $layout) {
+        foreach ($layouts as $layout) {
             $out[$layout] = MteDesign::sanitize($layout, isset($stored[$layout]) && is_array($stored[$layout]) ? $stored[$layout] : []);
         }
 
         return $out;
+    }
+
+    public function getCustomLayouts($idShop = null)
+    {
+        return MteRepository::listLayouts($idShop ? (int) $idShop : (int) $this->context->shop->id);
+    }
+
+    public function getCustomLayoutHtml($layout, $idShop = null)
+    {
+        static $cache = [];
+        $id = (int) substr((string) $layout, 7);
+        $idShop = $idShop ? (int) $idShop : (int) $this->context->shop->id;
+        if (!isset($cache[$idShop][$id])) {
+            $row = MteRepository::getLayout($id, $idShop);
+            $cache[$idShop][$id] = $row ? (string) $row['html'] : '';
+        }
+
+        return $cache[$idShop][$id];
+    }
+
+    /**
+     * Imported/auto-extracted content keeps PrestaShop's own styling only with the PrestaShop design.
+     */
+    public static function normalizeFor($layout)
+    {
+        return $layout !== 'prestashop';
     }
 
     public function getSocial()
@@ -186,9 +222,9 @@ class MailTemplateEditor extends Module
      */
     public function renderEmail($content, $idLang, $idShop = null, array $override = null, $title = '')
     {
-        $layout = isset($override['layout']) ? $override['layout'] : $this->getLayout();
-        $all = $this->getAllSettings();
-        $settings = isset($override['settings']) ? $override['settings'] : $all[$layout];
+        $layout = isset($override['layout']) ? $override['layout'] : $this->getLayout($idShop);
+        $all = $this->getAllSettings($idShop);
+        $settings = isset($override['settings']) ? $override['settings'] : (isset($all[$layout]) ? $all[$layout] : []);
         $lang = new Language((int) $idLang);
         $extra = [
             'lang_iso' => $lang->iso_code ?: 'en',
@@ -196,7 +232,11 @@ class MailTemplateEditor extends Module
             'logo' => $this->hasLogo($idShop),
             'title' => $title,
             'social' => isset($override['social']) ? $override['social'] : $this->getSocial(),
+            'keep_tokens' => !empty($override['keep_tokens']),
         ];
+        if (MteDesign::isCustom($layout)) {
+            $extra['layout_html'] = isset($override['layout_html']) ? $override['layout_html'] : $this->getCustomLayoutHtml($layout, $idShop);
+        }
         foreach (['footer' => 'MTE_FOOTER', 'about' => 'MTE_ABOUT', 'contact' => 'MTE_CONTACT'] as $field => $key) {
             $extra[$field . '_html'] = isset($override[$field]) ? (string) $override[$field]
                 : (string) Configuration::get($key, (int) $idLang, null, $idShop);
@@ -269,7 +309,7 @@ class MailTemplateEditor extends Module
             if ($row) {
                 $content = $row['content'];
             } elseif ($mode === self::MODE_ALL && trim((string) $params['template_html']) !== '') {
-                $content = MteContentExtractor::extract($params['template_html'], true);
+                $content = MteContentExtractor::extract($params['template_html'], self::normalizeFor($this->getLayout($idShop)));
                 if (trim(strip_tags($content)) === '') {
                     return;
                 }

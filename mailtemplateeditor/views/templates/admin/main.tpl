@@ -31,16 +31,10 @@
 
           <div class="panel">
             <div class="panel-heading"><i class="icon-th-large"></i> {l s='Design' mod='mailtemplateeditor'}</div>
-            <div class="mte-layouts">
-              {foreach $mte_layouts as $layout}
-                <label class="mte-layout-card" data-layout="{$layout|escape:'html':'UTF-8'}">
-                  <input type="radio" name="mte_layout" value="{$layout|escape:'html':'UTF-8'}">
-                  <span class="mte-thumb mte-thumb-{$layout|escape:'html':'UTF-8'}"><i></i><b></b><em></em><em></em><u></u></span>
-                  <span class="mte-layout-name">
-                    {if $layout == 'classic'}{l s='Classic' mod='mailtemplateeditor'}{elseif $layout == 'modern'}{l s='Modern' mod='mailtemplateeditor'}{else}{l s='Minimal' mod='mailtemplateeditor'}{/if}
-                  </span>
-                </label>
-              {/foreach}
+            <div class="mte-layouts" id="mte-layouts"></div>
+            <div class="mte-layout-actions">
+              <button type="button" class="btn btn-default btn-sm" id="mte-builder-copy"><i class="icon-copy"></i> {l s='Edit a copy in the visual builder' mod='mailtemplateeditor'}</button>
+              <button type="button" class="btn btn-default btn-sm" id="mte-builder-new"><i class="icon-plus"></i> {l s='New empty design' mod='mailtemplateeditor'}</button>
             </div>
             <p class="help-block">{l s='Each design keeps its own colours and sizes. Switching design does not lose your changes.' mod='mailtemplateeditor'}</p>
           </div>
@@ -138,10 +132,11 @@
           <div class="panel mte-preview-panel">
             <div class="panel-heading"><i class="icon-eye"></i> {l s='Live preview' mod='mailtemplateeditor'}
               <span class="mte-preview-tools">
+                <select class="form-control input-sm mte-inline-select" id="mte-preview-template" title="{l s='E-mail shown in the preview' mod='mailtemplateeditor'}"></select>
                 <select class="form-control input-sm mte-inline-select" id="mte-preview-lang"></select>
-                <span class="btn-group">
-                  <button type="button" class="btn btn-default btn-sm active" data-mte-device="desktop"><i class="icon-desktop"></i></button>
-                  <button type="button" class="btn btn-default btn-sm" data-mte-device="mobile"><i class="icon-mobile"></i></button>
+                <span class="mte-seg mte-seg-inline" role="group">
+                  <button type="button" class="mte-seg-btn active" data-mte-device="desktop" title="Desktop"><i class="icon-desktop"></i></button>
+                  <button type="button" class="mte-seg-btn" data-mte-device="mobile" title="Mobile"><i class="icon-mobile"></i></button>
                 </span>
               </span>
             </div>
@@ -159,9 +154,9 @@
             <div class="panel-heading"><i class="icon-list"></i> {l s='E-mails' mod='mailtemplateeditor'}</div>
             <select class="form-control" id="mte-content-lang"></select>
             <input type="search" class="form-control" id="mte-template-search" placeholder="{l s='Search...' mod='mailtemplateeditor'}">
-            <div class="btn-group btn-group-justified mte-filter">
-              <a class="btn btn-default btn-sm active" data-mte-filter="all">{l s='All' mod='mailtemplateeditor'}</a>
-              <a class="btn btn-default btn-sm" data-mte-filter="custom">{l s='Customised' mod='mailtemplateeditor'}</a>
+            <div class="mte-seg mte-filter" role="group">
+              <button type="button" class="mte-seg-btn active" data-mte-filter="all">{l s='All' mod='mailtemplateeditor'}</button>
+              <button type="button" class="mte-seg-btn" data-mte-filter="custom">{l s='Customised' mod='mailtemplateeditor'}</button>
             </div>
             <div id="mte-template-list" class="mte-list"></div>
             <button type="button" class="btn btn-default btn-block" id="mte-bulk-import"><i class="icon-download"></i> {l s='Import all originals' mod='mailtemplateeditor'}</button>
@@ -194,6 +189,7 @@
                 <button type="button" class="btn btn-default btn-sm" id="mte-insert-button"><i class="icon-hand-o-up"></i> {l s='Button' mod='mailtemplateeditor'}</button>
                 <button type="button" class="btn btn-default btn-sm" id="mte-insert-box"><i class="icon-square-o"></i> {l s='Box' mod='mailtemplateeditor'}</button>
                 <button type="button" class="btn btn-default btn-sm" id="mte-repair" title="{l s='Fixes broken text such as ÎšÎ±Î»Î·Î¼Î­ÏÎ± back into Greek' mod='mailtemplateeditor'}"><i class="icon-magic"></i> {l s='Repair Greek characters' mod='mailtemplateeditor'}</button>
+                <button type="button" class="btn btn-default btn-sm" id="mte-content-builder"><i class="icon-th-large"></i> {l s='Visual builder' mod='mailtemplateeditor'}</button>
                 <button type="button" class="btn btn-default btn-sm" id="mte-toggle-source"><i class="icon-code"></i> <span>{l s='HTML source' mod='mailtemplateeditor'}</span></button>
               </div>
 
@@ -260,4 +256,26 @@
   </div>
 
   <div id="mte-toast" class="mte-toast"></div>
+
+  {* ============================== VISUAL BUILDER ============================== *}
+  <div id="mte-builder" class="mte-builder" hidden>
+    <div class="mte-builder-bar">
+      <strong class="mte-builder-title"><i class="icon-th-large"></i> {l s='Visual builder' mod='mailtemplateeditor'}</strong>
+      <input type="text" class="form-control mte-builder-name" id="mte-builder-name" placeholder="{l s='Design name' mod='mailtemplateeditor'}">
+      <span class="mte-builder-hint" id="mte-builder-hint"></span>
+      <span class="mte-builder-buttons">
+        <button type="button" class="btn btn-default" id="mte-builder-preview"><i class="icon-eye"></i> {l s='Preview with e-mail' mod='mailtemplateeditor'}</button>
+        <button type="button" class="btn btn-primary" id="mte-builder-save"><i class="icon-save"></i> {l s='Save' mod='mailtemplateeditor'}</button>
+        <button type="button" class="btn btn-default" id="mte-builder-close"><i class="icon-remove"></i> {l s='Close' mod='mailtemplateeditor'}</button>
+      </span>
+    </div>
+    <div class="mte-builder-body"><div id="mte-gjs"></div></div>
+    <div class="mte-builder-preview" id="mte-builder-preview-wrap" hidden>
+      <div class="mte-builder-preview-bar">
+        <strong>{l s='Preview with e-mail' mod='mailtemplateeditor'}</strong>
+        <button type="button" class="btn btn-default btn-sm" id="mte-builder-preview-close"><i class="icon-remove"></i> {l s='Close' mod='mailtemplateeditor'}</button>
+      </div>
+      <iframe id="mte-builder-preview-frame" class="mte-frame" title="preview"></iframe>
+    </div>
+  </div>
 </div>

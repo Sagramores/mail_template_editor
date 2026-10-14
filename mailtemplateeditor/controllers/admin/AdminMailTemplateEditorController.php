@@ -65,6 +65,8 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         foreach (MteDesign::LAYOUTS as $layout) {
             $defaults[$layout] = MteDesign::defaults($layout);
         }
+        $defaults['custom'] = MteDesign::defaults('custom_0');
+        $assets = $this->module->getPathUri() . 'views/lib/grapesjs/';
 
         $config = [
             'ajaxUrl' => $this->context->link->getAdminLink('AdminMailTemplateEditor') . '&ajax=1',
@@ -86,6 +88,19 @@ class AdminMailTemplateEditorController extends ModuleAdminController
             'tinymce' => file_exists(_PS_ROOT_DIR_ . '/js/tiny_mce/tinymce.min.js'),
             'tinymceSkin' => is_file(_PS_ROOT_DIR_ . '/js/tiny_mce/skins/prestashop/skin.min.css') ? 'prestashop' : 'lightgray',
             'canEdit' => $this->canEdit(),
+            'customLayouts' => $this->customLayoutsForJs(),
+            'layoutNames' => [
+                'prestashop' => $this->plain($this->t('PrestaShop')),
+                'classic' => $this->plain($this->t('Classic')),
+                'modern' => $this->plain($this->t('Modern')),
+                'minimal' => $this->plain($this->t('Minimal')),
+            ],
+            'logoUrl' => $this->logoUrl(),
+            'builder' => [
+                'js' => [$assets . 'grapes.min.js?v=0.23.6', $assets . 'grapesjs-preset-newsletter.js?v=1.0.2', $assets . 'locale-el.js?v=0.23.6'],
+                'css' => [$assets . 'grapes.min.css?v=0.23.6'],
+                'locale' => in_array($this->context->language->iso_code, ['el', 'gr'], true) ? 'el' : 'en',
+            ],
             'i18n' => $this->jsTranslations(),
         ];
 
@@ -129,6 +144,22 @@ class AdminMailTemplateEditorController extends ModuleAdminController
             'buttonUrl' => $this->t('Button link (you can use variables, e.g. {shop_url})'),
             'source' => $this->t('HTML source'),
             'visual' => $this->t('Visual editor'),
+            'edit' => $this->t('Edit'),
+            'delete' => $this->t('Delete'),
+            'copy' => $this->t('copy'),
+            'blockContent' => $this->t('E-mail content'),
+            'blockLogo' => $this->t('Logo'),
+            'blockSocial' => $this->t('Social networks'),
+            'blockFooter' => $this->t('Footer text'),
+            'blockColumns' => $this->t('About us / Contact'),
+            'blockShopName' => $this->t('Shop name'),
+            'builderHintLayout' => $this->t('Drag blocks from the right. The "E-mail content" block is where each e-mail text appears.'),
+            'builderHintContent' => $this->t('Editing the content of this e-mail. Save returns it to the editor; then press Save there.'),
+            'confirmCloseBuilder' => $this->t('Close the builder? Unsaved changes will be lost.'),
+            'needName' => $this->t('Give the design a name.'),
+            'needContent' => $this->t('The design must contain the "E-mail content" block.'),
+            'designSaved' => $this->t('Design saved. Press "Save design" to use it for your e-mails.'),
+            'confirmDeleteLayout' => $this->t('Delete this design?'),
         ]);
     }
 
@@ -318,7 +349,9 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         $override = $this->designFromRequest(false);
         $content = $this->content('content');
         if ($content === '') {
-            $content = $this->sampleContent($idLang);
+            // The real content of a PrestaShop e-mail (customised version if there is one).
+            $layout = $override ? $override['layout'] : $this->module->getLayout();
+            $content = $this->previewContent((string) Tools::getValue('preview_module') ?: 'core', (string) Tools::getValue('preview_template') ?: 'order_conf', $idLang, $layout);
         }
         $html = $this->module->renderEmail($content, $idLang, null, $override, MteEncoding::toUtf8($this->raw('subject')));
         $this->json(['html' => $this->fillPreviewVars($html, $idLang)]);
@@ -327,7 +360,10 @@ class AdminMailTemplateEditorController extends ModuleAdminController
     protected function designFromRequest($strict)
     {
         $layout = (string) Tools::getValue('layout');
-        if (!in_array($layout, MteDesign::LAYOUTS, true)) {
+        if (MteDesign::isCustom($layout) && $this->raw('layout_html') === '' && $this->module->getCustomLayoutHtml($layout) === '') {
+            $layout = '';
+        }
+        if (!MteDesign::isValid($layout)) {
             if ($strict) {
                 $this->fail($this->t('Invalid design.'));
             }
@@ -338,11 +374,21 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         $social = json_decode((string) $this->raw('social'), true);
         $idLang = (int) Tools::getValue('id_lang');
 
+        if (MteDesign::isCustom($layout) && $this->raw('layout_html') !== '') {
+            // Unsaved design from the visual builder.
+            $html = MteDesign::cleanCustomHtml($this->content('layout_html'), $this->logoUrl());
+            if ($html !== false) {
+                $layoutHtml = $html;
+            }
+        }
         $override = [
             'layout' => $layout,
             'settings' => MteDesign::sanitize($layout, is_array($settings) ? $settings : []),
             'social' => $this->cleanSocial(is_array($social) ? $social : []),
         ];
+        if (isset($layoutHtml)) {
+            $override['layout_html'] = $layoutHtml;
+        }
         $ml = json_decode((string) MteEncoding::decodeTransport($this->raw('multilang')), true);
         if (is_array($ml)) {
             foreach (['footer', 'about', 'contact'] as $field) {
@@ -415,6 +461,108 @@ class AdminMailTemplateEditorController extends ModuleAdminController
             $this->fail($this->t('PrestaShop could not send the e-mail. Check Advanced Parameters > E-mail and the logs.'));
         }
         $this->json([]);
+    }
+
+    /* --------------------------------------------------------------------
+     * Visual builder (custom designs)
+     * ------------------------------------------------------------------ */
+
+    protected function customLayoutsForJs()
+    {
+        $out = [];
+        foreach ($this->module->getCustomLayouts() as $row) {
+            $out[] = ['key' => 'custom_' . (int) $row['id_mte_layout'], 'id' => (int) $row['id_mte_layout'], 'name' => $row['name']];
+        }
+
+        return $out;
+    }
+
+    protected function logoUrl()
+    {
+        $logo = $this->module->getLogoFile();
+
+        return $logo ? $this->context->link->getMediaLink(_PS_IMG_ . $logo) : '';
+    }
+
+    /**
+     * For the builder canvas: the real logo instead of the {shop_logo} variable.
+     */
+    protected function forCanvas($html)
+    {
+        $logo = $this->logoUrl();
+
+        return $logo !== '' ? str_replace('{shop_logo}', $logo, $html) : $html;
+    }
+
+    public function ajaxProcessLoadLayout()
+    {
+        $row = MteRepository::getLayout((int) Tools::getValue('id_layout'), (int) $this->context->shop->id);
+        if (!$row) {
+            $this->fail($this->t('Design not found.'));
+        }
+        $this->json([
+            'id' => (int) $row['id_mte_layout'],
+            'name' => $row['name'],
+            'html' => $this->forCanvas($row['html']),
+            'project' => $row['project'],
+        ]);
+    }
+
+    /**
+     * Starting HTML for a new design: an existing design (with its current settings)
+     * where the dynamic parts are blocks, or an empty one.
+     */
+    public function ajaxProcessBuilderStart()
+    {
+        $from = (string) Tools::getValue('from');
+        $idLang = (int) $this->context->language->id;
+        if ($from === 'blank') {
+            $html = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;"><tr><td align="center" style="padding:30px 10px;">'
+                . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background-color:#ffffff;"><tr><td align="center" style="padding:25px;">'
+                . MteDesign::tokenBlock('logo') . '</td></tr><tr><td style="padding:10px 30px 30px;font-family:Arial, Helvetica, sans-serif;font-size:14px;color:#333333;">'
+                . MteDesign::tokenBlock('content') . '</td></tr><tr><td align="center" style="padding:20px;font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#888888;">'
+                . MteDesign::tokenBlock('footer') . '</td></tr></table></td></tr></table>';
+        } else {
+            if (!MteDesign::isValid($from)) {
+                $this->fail($this->t('Invalid design.'));
+            }
+            $html = $this->module->renderEmail('', $idLang, null, ['layout' => $from, 'keep_tokens' => true]);
+            // Only the body is edited in the builder.
+            if (preg_match('#<body[^>]*>(.*)</body>#is', $html, $m)) {
+                $html = $m[1];
+            }
+        }
+        $this->json(['html' => $this->forCanvas($html)]);
+    }
+
+    public function ajaxProcessSaveLayout()
+    {
+        $this->requireEdit();
+        $name = trim(strip_tags(MteEncoding::toUtf8($this->raw('name'))));
+        if ($name === '') {
+            $this->fail($this->t('Give the design a name.'));
+        }
+        $html = MteDesign::cleanCustomHtml($this->content('html'), $this->logoUrl());
+        if ($html === false) {
+            $this->fail($this->t('The design must contain the "E-mail content" block.'));
+        }
+        $project = $this->content('project');
+        $id = MteRepository::saveLayout((int) Tools::getValue('id_layout'), (int) $this->context->shop->id, $name, $html, $project);
+        if (!$id) {
+            $this->fail(Db::getInstance()->getMsgError());
+        }
+        $this->json(['id' => $id, 'key' => 'custom_' . $id, 'name' => $name, 'layouts' => $this->customLayoutsForJs(), 'settings' => $this->module->getAllSettings()]);
+    }
+
+    public function ajaxProcessDeleteLayout()
+    {
+        $this->requireEdit();
+        $id = (int) Tools::getValue('id_layout');
+        MteRepository::deleteLayout($id, (int) $this->context->shop->id);
+        if (Configuration::get('MTE_LAYOUT') === 'custom_' . $id) {
+            Configuration::updateValue('MTE_LAYOUT', 'prestashop');
+        }
+        $this->json(['layouts' => $this->customLayoutsForJs(), 'layout' => $this->module->getLayout()]);
     }
 
     /* --------------------------------------------------------------------
@@ -586,6 +734,25 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         return strtr($html, $this->sampleVars($idLang));
     }
 
+    /**
+     * Content used by the design preview: what this e-mail will really contain.
+     */
+    protected function previewContent($module, $template, $idLang, $layout)
+    {
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $module) || !preg_match('/^[a-zA-Z0-9_.-]+$/', $template)) {
+            $module = 'core';
+            $template = 'order_conf';
+        }
+        $row = MteRepository::get((int) $this->context->shop->id, $idLang, $module, $template);
+        if ($row && $row['active']) {
+            return $row['content'];
+        }
+        $html = $this->originalHtml($module, $template, Language::getIsoById($idLang));
+        $content = $html !== '' ? MteContentExtractor::extract($html, MailTemplateEditor::normalizeFor($layout)) : '';
+
+        return trim(strip_tags($content)) !== '' ? $content : $this->sampleContent($idLang);
+    }
+
     protected function sampleContent($idLang)
     {
         if (in_array(Language::getIsoById($idLang), ['el', 'gr'], true)) {
@@ -594,8 +761,7 @@ class AdminMailTemplateEditorController extends ModuleAdminController
                 . '<p>Η παραγγελία σας <strong>{order_name}</strong> καταχωρήθηκε με επιτυχία. Θα σας ενημερώσουμε μόλις αποσταλεί.</p>'
                 . '<div class="mte-box"><h3>Στοιχεία παραγγελίας</h3><p>Τρόπος πληρωμής: {payment}<br>Σύνολο: {total_paid}</p></div>'
                 . '<table width="100%"><tr><th>Κωδικός</th><th>Προϊόν</th><th align="right">Τιμή</th><th align="center">Ποσότητα</th><th align="right">Σύνολο</th></tr><!--mte:{products}--></table>'
-                . '<p style="text-align:center"><a class="mte-button" href="{history_url}">Δείτε την παραγγελία σας</a></p>'
-                . '<p>Με εκτίμηση,<br>Η ομάδα του {shop_name}</p>';
+                . '<p style="text-align:center"><a class="mte-button" href="{history_url}">Δείτε την παραγγελία σας</a></p>';
         }
 
         return '<h1>Thank you for your order!</h1>'
@@ -603,7 +769,6 @@ class AdminMailTemplateEditorController extends ModuleAdminController
             . '<p>Your order <strong>{order_name}</strong> has been placed successfully. We will let you know as soon as it ships.</p>'
             . '<div class="mte-box"><h3>Order details</h3><p>Payment: {payment}<br>Total: {total_paid}</p></div>'
             . '<table width="100%"><tr><th>Reference</th><th>Product</th><th align="right">Price</th><th align="center">Quantity</th><th align="right">Total</th></tr><!--mte:{products}--></table>'
-            . '<p style="text-align:center"><a class="mte-button" href="{history_url}">View your order</a></p>'
-            . '<p>Kind regards,<br>The {shop_name} team</p>';
+            . '<p style="text-align:center"><a class="mte-button" href="{history_url}">View your order</a></p>';
     }
 }

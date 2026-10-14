@@ -38,16 +38,49 @@ class MteContentExtractor
         foreach ($xpath->query('//img[contains(@src, "{shop_logo}")]') as $img) {
             self::removeBlock($img, ['tr', 'table', 'div'], 'shop_logo');
         }
+        // The {shop_name} link is footer only when it stands alone (not inside a sentence)
+        // and nothing meaningful follows it. In "account" it is part of the text and stays.
+        $links = [];
+        foreach ($xpath->query('//a[contains(@href, "{shop_url}") and normalize-space(.) = "{shop_name}"]') as $a) {
+            $links[] = $a;
+        }
+        foreach ($links as $a) {
+            if (!$a->parentNode || self::meaningfulText($a->parentNode, 'shop_url') !== '') {
+                continue;
+            }
+            $after = '';
+            foreach ($xpath->query('following::text()', $a) as $t) {
+                $after .= ' ' . $t->nodeValue;
+            }
+            if (self::meaningfulText($doc->createTextNode($after), 'shop_url') === '') {
+                self::removeBlock($a, ['tr', 'p', 'div', 'table'], 'shop_url');
+            }
+        }
         // Footer: "powered by PrestaShop" and the {shop_name} link row at the bottom.
         foreach ($xpath->query('//text()[contains(translate(., "POWERED", "powered"), "powered by")]') as $node) {
             self::removeBlock($node, ['tr', 'div', 'p', 'table'], 'powered');
         }
-        foreach ($xpath->query('//a[contains(@href, "{shop_url}") and normalize-space(.) = "{shop_name}"]') as $a) {
-            self::removeBlock($a, ['tr', 'p', 'div', 'table'], 'shop_url');
-        }
         // Spacer-only elements (MJML output is full of them).
-        foreach ($xpath->query('//div[not(node()) or (normalize-space(.) = "" and not(.//img) and not(.//a) and not(.//table) and not(.//hr) and string-length(@style) > 0 and contains(@style, "height"))]') as $div) {
-            $div->parentNode->removeChild($div);
+        $nbsp = "\xC2\xA0";
+        $empty = 'normalize-space(translate(., "' . $nbsp . '", " ")) = "" and not(.//img) and not(.//a) and not(.//table) and not(.//hr)';
+        $spacers = [];
+        foreach ($xpath->query('//div[not(node()) or (' . $empty . ' and string-length(@style) > 0 and contains(@style, "height"))]') as $div) {
+            $spacers[] = $div;
+        }
+        foreach ($spacers as $div) {
+            if ($div->parentNode) {
+                $div->parentNode->removeChild($div);
+            }
+        }
+        // Sections left empty once their spacers are gone.
+        $spacers = [];
+        foreach ($xpath->query('//body/div[' . $empty . '] | //body/*/div[' . $empty . ' and not(ancestor::table)]') as $div) {
+            $spacers[] = $div;
+        }
+        foreach ($spacers as $div) {
+            if ($div->parentNode) {
+                $div->parentNode->removeChild($div);
+            }
         }
 
         $body = $doc->getElementsByTagName('body')->item(0);
@@ -56,6 +89,12 @@ class MteContentExtractor
         }
         if ($normalizeStyles) {
             self::normalize($xpath);
+        } else {
+            self::removeFrame($body);
+            // The card of the original layout (PrestaShop "modern"/"classic" mail themes).
+            foreach ($xpath->query('//*[contains(@style, "box-shadow") or contains(concat(" ", normalize-space(@class), " "), " wrapper-container ") or contains(concat(" ", normalize-space(@class), " "), " shadow ")]') as $el) {
+                self::stripFrameStyle($el);
+            }
         }
 
         $out = '';
@@ -173,6 +212,59 @@ class MteContentExtractor
         $text = str_ireplace(['{shop_name}', '{shop_url}', 'powered by', 'prestashop™', 'prestashop', '™', '|', ' '], '', $text);
 
         return trim($text);
+    }
+
+    /**
+     * The outer "frame" of the original e-mail (page background, card with shadow,
+     * fixed width) is provided by the design: remove it from the elements that wrap
+     * the whole content, keep every style of the content itself.
+     */
+    protected static function stripFrameStyle(DOMElement $el)
+    {
+        $frame = '/(^|;)\s*(background-color|background|box-shadow|-webkit-box-shadow|border-radius|max-width|width|min-width|margin)\s*:[^;]*/i';
+        if ($el->hasAttribute('style')) {
+            $style = trim(preg_replace('/;{2,}/', ';', preg_replace($frame, '$1', $el->getAttribute('style'))), "; \t\n");
+            if ($style === '') {
+                $el->removeAttribute('style');
+            } else {
+                $el->setAttribute('style', $style);
+            }
+        }
+        foreach (['bgcolor', 'class'] as $attr) {
+            $el->removeAttribute($attr);
+        }
+        if ($el->hasAttribute('width') && (int) $el->getAttribute('width') > 200) {
+            $el->setAttribute('width', '100%');
+        }
+    }
+
+    protected static function removeFrame(DOMElement $body)
+    {
+        $cur = $body;
+        for ($depth = 0; $depth < 40 && $cur; ++$depth) {
+            $children = [];
+            foreach ($cur->childNodes as $child) {
+                if ($child instanceof DOMElement) {
+                    $children[] = $child;
+                } elseif ($child->nodeType === XML_TEXT_NODE && trim($child->nodeValue) !== '') {
+                    $children = [];
+                    break;
+                }
+            }
+            if ($cur !== $body) {
+                self::stripFrameStyle($cur);
+            }
+            if (count($children) !== 1) {
+                // Sections of the content: only their fixed width and centring margin go.
+                foreach ($children as $child) {
+                    if ($child->hasAttribute('style')) {
+                        $child->setAttribute('style', trim(preg_replace('/;{2,}/', ';', preg_replace('/(^|;)\s*(max-width|margin)\s*:[^;]*/i', '$1', $child->getAttribute('style'))), "; \t\n"));
+                    }
+                }
+                break;
+            }
+            $cur = $children[0];
+        }
     }
 
     /**

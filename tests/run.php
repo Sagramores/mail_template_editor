@@ -69,6 +69,8 @@ $full = MteDesign::render('modern', MteDesign::defaults('modern'), $out, ['logo'
 check('ps8: products restored on render', (bool) preg_match('/<\/tr>\s*\{products\}\s*\{discounts\}\s*<tr/', $full));
 check('ps8: txt restores vars', strpos(MteDesign::toText($out), '{products_txt}') !== false);
 $out = MteContentExtractor::extract(file_get_contents($fx . 'ps8_account.html'));
+check('ps8 account: shop link inside text kept', (bool) preg_match('/place orders on our store:.*?<a[^>]*href="\{shop_url\}"[^>]*>\{shop_name\}<\/a>/s', $out), $out);
+check('ps8 account: footer link removed', substr_count($out, '>{shop_name}</a>') === 1, $out);
 check('ps8 account: content', strpos($out, '{firstname}') !== false && strpos($out, '{email}') !== false && strpos($out, '{shop_logo}') === false, $out);
 
 // --- design
@@ -91,6 +93,20 @@ foreach (MteDesign::LAYOUTS as $layout) {
     check("$layout: empty footer blocks removed", strpos($nologo, 'facebook') === false);
     file_put_contents(sys_get_temp_dir() . "/mte_preview_$layout.html", strtr($html, ['{firstname}' => 'Γιώργος', '{shop_name}' => 'Το Κατάστημα', '{shop_url}' => '#', '{shop_logo}' => 'data:image/svg+xml;utf8,' . rawurlencode('<svg xmlns="http://www.w3.org/2000/svg" width="180" height="50"><rect width="180" height="50" rx="6" fill="#999"/><text x="90" y="32" font-size="18" text-anchor="middle" fill="#fff" font-family="Arial">LOGO</text></svg>')]));
 }
+// custom designs (visual builder)
+$start = MteDesign::render('modern', MteDesign::defaults('modern'), '', ['logo' => true, 'keep_tokens' => true]);
+check('builder start: tokens kept', strpos($start, '<div data-mte-token="content">[[content]]</div>') !== false && strpos($start, '[[social]]') !== false && strpos($start, '<!--mte:') === false, $start);
+check('builder start: settings applied', strpos($start, '#4f46e5') !== false && strpos($start, '[[accent]]') === false);
+$custom = MteDesign::cleanCustomHtml('<body><table><tr><td><img src="https://shop.gr/img/logo.png"><div data-mte-token="content">[[content]]</div><p onclick="x()">Υποσέλιδο {shop_name}</p><script>alert(1)</script></td></tr></table></body>', 'https://shop.gr/img/logo.png');
+check('custom: logo back to variable', strpos($custom, 'src="{shop_logo}"') !== false);
+check('custom: scripts/handlers removed', strpos($custom, '<script') === false && strpos($custom, 'onclick') === false);
+check('custom: full document', strpos($custom, '<!DOCTYPE html>') === 0 && strpos($custom, 'charset=utf-8') !== false);
+check('custom: needs content', MteDesign::cleanCustomHtml('<p>no content</p>') === false);
+$out = MteDesign::render('custom_7', MteDesign::defaults('custom_7'), '<p>Γεια {firstname}</p>', ['layout_html' => $custom, 'lang_iso' => 'el']);
+check('custom: render', strpos($out, 'Γεια {firstname}</p>') !== false && strpos($out, '[[') === false && strpos($out, 'lang="el"') !== false && strpos($out, 'Υποσέλιδο {shop_name}') !== false, $out);
+$out = MteDesign::render('custom_7', [], '<p>x</p>', ['layout_html' => '<p>broken</p>']);
+check('custom: broken design falls back', strpos($out, '<p') !== false && strpos($out, 'broken') === false);
+
 $s = MteDesign::sanitize('modern', ['font_size' => 99, 'accent' => 'red;}', 'font_family' => 'evil', 'text_color' => '#ABCDEF']);
 check('sanitize limits', $s['font_size'] === 24 && $s['accent'] === '#4f46e5' && $s['font_family'] === 'segoe' && $s['text_color'] === '#abcdef');
 check('toText', MteDesign::toText('<p>Γεια <a href="http://x.gr">εδώ</a></p><ul><li>α</li></ul>') === "Γεια εδώ (http://x.gr)\n- α");

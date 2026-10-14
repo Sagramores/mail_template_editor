@@ -75,3 +75,47 @@
 .mte-toast { position: fixed; right: 24px; bottom: 24px; z-index: 10000; background: #72c279; color: #fff; padding: 10px 16px; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.2); opacity: 0; transform: translateY(10px); transition: all .2s; pointer-events: none; max-width: 420px; }
 .mte-toast.mte-toast-show { opacity: 1; transform: none; }
 .mte-toast.mte-toast-error { background: #e08f95; }
+
+/* layout cards (built-in + custom) */
+.mte-layouts .mte-layout-card { position: relative; flex: 1 1 120px; max-width: 170px; }
+.mte-thumb-prestashop { background: #eeeeee; }
+.mte-thumb-prestashop i { top: 8px; height: 62px; left: 20%; right: 20%; background: #fff; border-radius: 2px; box-shadow: 0 6px 10px rgba(0,0,0,.1); }
+.mte-thumb-prestashop b { top: 14px; height: 8px; left: 42%; right: 42%; background: #df0067; border-radius: 2px; }
+.mte-thumb-prestashop em { top: 32px; height: 4px; background: #c8c8c8; left: 27%; right: 35%; }
+.mte-thumb-prestashop em + em { top: 44px; left: 27%; right: 27%; height: 12px; background: #fdfdfd; border: 1px solid #dfdfdf; }
+.mte-thumb-prestashop u { top: 78px; height: 4px; left: 38%; right: 38%; background: #b5b5b5; }
+.mte-thumb-custom { background: repeating-linear-gradient(45deg, #f4fbfd, #f4fbfd 8px, #e8f6fa 8px, #e8f6fa 16px); border: 1px dashed #25b9d7; }
+.mte-thumb-custom i { top: 10px; height: 10px; left: 30%; right: 30%; background: #25b9d7; border-radius: 2px; }
+.mte-thumb-custom b { top: 28px; height: 40px; left: 18%; right: 18%; background: #fff; border: 2px dashed #25b9d7; }
+.mte-thumb-custom em, .mte-thumb-custom u { display: none; }
+.mte-card-tools { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; }
+.mte-card-btn { border: 1px solid #ccc; background: #fff; border-radius: 3px; padding: 2px 6px; font-size: 12px; line-height: 1.4; cursor: pointer; color: #363a41; }
+.mte-card-btn:hover { border-color: #25b9d7; color: #25b9d7; }
+.mte-layout-actions { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* segmented buttons, independent from the admin theme (PrestaShop 8 and 9) */
+.mte-app .mte-seg { display: flex; width: 100%; border: 1px solid #bbcdd2; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+.mte-app .mte-seg.mte-seg-inline { display: inline-flex; width: auto; margin: 0 0 0 6px; vertical-align: middle; }
+.mte-app .mte-seg-btn { flex: 1 1 0; border: 0; border-right: 1px solid #bbcdd2; background: #fff; color: #363a41; padding: 5px 12px; font-size: 13px; line-height: 1.4; cursor: pointer; text-decoration: none; box-shadow: none; border-radius: 0; margin: 0; font-weight: 400; }
+.mte-app .mte-seg-btn:last-child { border-right: 0; }
+.mte-app .mte-seg-btn:hover { background: #f4fbfd; }
+.mte-app .mte-seg-btn.active { background: #25b9d7; color: #fff; }
+.mte-app .mte-tabs > li > a, .mte-app .mte-tabs > li > a:hover, .mte-app .mte-tabs > li > a:focus { text-decoration: none !important; }
+.mte-app .mte-item, .mte-app .mte-var { text-decoration: none !important; }
+
+/* visual builder */
+body.mte-builder-open { overflow: hidden; }
+.mte-builder { position: fixed; inset: 0; z-index: 100000; background: #fff; display: flex; flex-direction: column; }
+.mte-builder[hidden] { display: none; }
+.mte-builder-bar { display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-bottom: 1px solid #ddd; background: #f8f9fa; flex-wrap: wrap; }
+.mte-builder-title { font-size: 15px; white-space: nowrap; }
+.mte-builder-name { max-width: 260px; }
+.mte-builder-hint { flex: 1 1 200px; color: #6c868e; font-size: 12px; }
+.mte-builder-buttons { display: flex; gap: 6px; margin-left: auto; }
+.mte-builder-body { flex: 1 1 auto; position: relative; min-height: 0; }
+.mte-builder-body #mte-gjs { position: absolute; inset: 0; }
+.mte-builder-preview { position: absolute; top: 56px; right: 0; bottom: 0; width: min(760px, 100%); background: #e9ecef; box-shadow: -6px 0 20px rgba(0,0,0,.15); display: flex; flex-direction: column; z-index: 5; overflow: auto; }
+.mte-builder-preview[hidden] { display: none; }
+.mte-builder-preview-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #fff; border-bottom: 1px solid #ddd; }
+.mte-builder-preview .mte-frame { margin: 12px; width: calc(100% - 24px); }
+#mte-preview-template { max-width: 190px; }

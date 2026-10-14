@@ -9,6 +9,7 @@ if (!defined('_PS_VERSION_')) {
 class MteRepository
 {
     const TABLE = 'mte_template';
+    const TABLE_LAYOUT = 'mte_layout';
 
     public static function install()
     {
@@ -28,12 +29,71 @@ class MteRepository
             KEY `mte_template` (`template`)
         ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
 
-        return Db::getInstance()->execute($sql);
+        return Db::getInstance()->execute($sql) && self::installLayouts();
+    }
+
+    /**
+     * Designs made with the visual builder.
+     */
+    public static function installLayouts()
+    {
+        return Db::getInstance()->execute('CREATE TABLE IF NOT EXISTS `' . _DB_PREFIX_ . self::TABLE_LAYOUT . '` (
+            `id_mte_layout` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `id_shop` INT UNSIGNED NOT NULL DEFAULT 1,
+            `name` VARCHAR(128) NOT NULL,
+            `html` MEDIUMTEXT NOT NULL,
+            `project` MEDIUMTEXT NOT NULL,
+            `date_upd` DATETIME NOT NULL,
+            PRIMARY KEY (`id_mte_layout`),
+            KEY `mte_layout_shop` (`id_shop`)
+        ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
     }
 
     public static function uninstall()
     {
-        return Db::getInstance()->execute('DROP TABLE IF EXISTS `' . _DB_PREFIX_ . self::TABLE . '`');
+        return Db::getInstance()->execute('DROP TABLE IF EXISTS `' . _DB_PREFIX_ . self::TABLE . '`, `' . _DB_PREFIX_ . self::TABLE_LAYOUT . '`');
+    }
+
+    /**
+     * @return array[] id, name, date_upd (no HTML)
+     */
+    public static function listLayouts($idShop)
+    {
+        return (array) Db::getInstance()->executeS('SELECT `id_mte_layout`, `name`, `date_upd` FROM `' . _DB_PREFIX_ . self::TABLE_LAYOUT . '`
+            WHERE `id_shop` = ' . (int) $idShop . ' ORDER BY `id_mte_layout`', true, false);
+    }
+
+    /**
+     * @return array|false
+     */
+    public static function getLayout($idLayout, $idShop)
+    {
+        return Db::getInstance()->getRow('SELECT * FROM `' . _DB_PREFIX_ . self::TABLE_LAYOUT . '`
+            WHERE `id_mte_layout` = ' . (int) $idLayout . ' AND `id_shop` = ' . (int) $idShop, false);
+    }
+
+    /**
+     * @return int id of the design, 0 on error
+     */
+    public static function saveLayout($idLayout, $idShop, $name, $html, $project)
+    {
+        $db = Db::getInstance();
+        $data = '`name` = \'' . pSQL(Tools::substr($name, 0, 128)) . '\', `html` = \'' . pSQL($html, true) . '\',
+            `project` = \'' . pSQL($project, true) . '\', `date_upd` = NOW()';
+        if ($idLayout && self::getLayout($idLayout, $idShop)) {
+            return $db->execute('UPDATE `' . _DB_PREFIX_ . self::TABLE_LAYOUT . '` SET ' . $data . '
+                WHERE `id_mte_layout` = ' . (int) $idLayout . ' AND `id_shop` = ' . (int) $idShop) ? (int) $idLayout : 0;
+        }
+        if (!$db->execute('INSERT INTO `' . _DB_PREFIX_ . self::TABLE_LAYOUT . '` SET `id_shop` = ' . (int) $idShop . ', ' . $data)) {
+            return 0;
+        }
+
+        return (int) $db->Insert_ID();
+    }
+
+    public static function deleteLayout($idLayout, $idShop)
+    {
+        return Db::getInstance()->delete(self::TABLE_LAYOUT, '`id_mte_layout` = ' . (int) $idLayout . ' AND `id_shop` = ' . (int) $idShop);
     }
 
     /**

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="[[lang]]" dir="[[dir]]" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<title>[[title]]</title>
+<style type="text/css">
+  body { margin:0; padding:0; background-color:[[page_bg]]; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; word-spacing:normal; }
+  table { border-collapse:collapse; }
+  img { border:0; -ms-interpolation-mode:bicubic; }
+  .mte-content a { color:[[link_color]]; }
+  @media only screen and (max-width: 640px) {
+    .mte-container { width:100% !important; }
+    .mte-pad { padding-left:20px !important; padding-right:20px !important; }
+    .mte-col { display:block !important; width:100% !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:[[page_bg]];">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">[[preheader]]</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:[[page_bg]];">
+  <tr>
+    <td align="center" style="padding:40px 10px 20px;">
+      <table role="presentation" class="mte-container" width="[[width]]" cellpadding="0" cellspacing="0" border="0" style="width:[[width]]px;max-width:[[width]]px;background-color:[[content_bg]];border-radius:[[radius]]px;box-shadow:0 20px 30px 0 rgba(0,0,0,0.1);">
+        <!-- Header -->
+        <tr>
+          <td class="mte-pad" align="[[logo_align]]" style="background-color:[[header_bg]];padding:45px 50px 0;border-radius:[[radius]]px [[radius]]px 0 0;font-family:[[font]];color:[[header_text]];">
+            [[logo]]
+          </td>
+        </tr>
+        <!-- Content -->
+        <tr>
+          <td class="mte-pad mte-content" style="padding:30px 50px 40px;font-family:[[font]];font-size:[[font_size]]px;line-height:[[line_height]];color:[[text_color]];text-align:left;">
+            [[content]]
+          </td>
+        </tr>
+      </table>
+      <!-- Footer -->
+      <table role="presentation" class="mte-container" width="[[width]]" cellpadding="0" cellspacing="0" border="0" style="width:[[width]]px;max-width:[[width]]px;">
+        <tr>
+          <td class="mte-pad" align="center" style="background-color:[[footer_bg]];padding:20px 25px;font-family:[[font]];font-size:[[small_size]]px;line-height:1.6;color:[[footer_text]];">
+            <!--mte:if footer_columns-->[[footer_columns]]<!--mte:endif-->
+            <!--mte:if social--><div style="padding-bottom:10px;">[[social]]</div><!--mte:endif-->
+            <!--mte:if footer--><div style="padding-bottom:10px;">[[footer]]</div><!--mte:endif-->
+            <a href="{shop_url}" style="color:[[footer_text]];font-size:16px;font-weight:600;text-decoration:underline;">{shop_name}</a>
+            <div style="padding-top:12px;">Powered by <a href="https://www.prestashop-project.org/" style="color:[[footer_text]];text-decoration:underline;">PrestaShop</a></div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

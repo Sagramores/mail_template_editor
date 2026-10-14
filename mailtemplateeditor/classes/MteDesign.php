@@ -12,11 +12,16 @@ if (!defined('_PS_VERSION_') && !defined('MTE_TESTING')) {
 
 class MteDesign
 {
-    const LAYOUTS = ['classic', 'modern', 'minimal'];
+    /** Built-in designs (views/layouts/<name>.html). Designs made with the builder are "custom_<id>". */
+    const LAYOUTS = ['prestashop', 'classic', 'modern', 'minimal'];
+
+    /** Tokens that become drop-in blocks in the visual builder. */
+    const BLOCK_TOKENS = ['content', 'logo', 'social', 'footer', 'footer_columns'];
 
     const SOCIAL = ['facebook' => 'Facebook', 'instagram' => 'Instagram', 'x' => 'X', 'youtube' => 'YouTube', 'tiktok' => 'TikTok', 'linkedin' => 'LinkedIn', 'pinterest' => 'Pinterest'];
 
     const FONTS = [
+        'opensans' => '"Open Sans", Arial, Helvetica, sans-serif',
         'arial' => 'Arial, Helvetica, sans-serif',
         'helvetica' => '"Helvetica Neue", Helvetica, Arial, sans-serif',
         'verdana' => 'Verdana, Geneva, sans-serif',
@@ -28,11 +33,24 @@ class MteDesign
         'courier' => '"Courier New", Courier, monospace',
     ];
 
+    public static function isCustom($layout)
+    {
+        return (bool) preg_match('/^custom_[0-9]+$/', (string) $layout);
+    }
+
+    public static function isValid($layout)
+    {
+        return in_array($layout, self::LAYOUTS, true) || self::isCustom($layout);
+    }
+
     /**
      * Default settings of each design.
      */
     public static function defaults($layout)
     {
+        if (self::isCustom($layout)) {
+            $layout = 'modern';
+        }
         $common = [
             'font_family' => 'arial',
             'font_size' => 14,
@@ -48,6 +66,32 @@ class MteDesign
             'uppercase_headings' => 0,
         ];
         switch ($layout) {
+            case 'prestashop':
+                // Same look as the default PrestaShop 1.7.6+ / 8 / 9 "modern" mail theme.
+                return array_merge($common, [
+                    'font_family' => 'opensans',
+                    'font_size' => 14,
+                    'heading_size' => 18,
+                    'small_size' => 12,
+                    'line_height' => 1.8,
+                    'width' => 604,
+                    'radius' => 4,
+                    'logo_width' => 200,
+                    'logo_align' => 'center',
+                    'page_bg' => '#eeeeee',
+                    'header_bg' => '#ffffff',
+                    'header_text' => '#363a41',
+                    'accent' => '#363a41',
+                    'content_bg' => '#ffffff',
+                    'text_color' => '#363a41',
+                    'heading_color' => '#363a41',
+                    'link_color' => '#25b9d7',
+                    'button_bg' => '#25b9d7',
+                    'button_text' => '#ffffff',
+                    'border_color' => '#dfdfdf',
+                    'footer_bg' => '#eeeeee',
+                    'footer_text' => '#656565',
+                ]);
             case 'modern':
                 return array_merge($common, [
                     'font_family' => 'segoe',
@@ -122,7 +166,7 @@ class MteDesign
      */
     public static function sanitize($layout, array $input)
     {
-        $layout = in_array($layout, self::LAYOUTS, true) ? $layout : 'classic';
+        $layout = self::isValid($layout) ? $layout : 'classic';
         $out = self::defaults($layout);
         foreach ($out as $key => $default) {
             if (!array_key_exists($key, $input)) {
@@ -155,15 +199,25 @@ class MteDesign
      * @param string $layout
      * @param array $s sanitized settings
      * @param string $content inner HTML of the e-mail
-     * @param array $extra footer_html, about_html, contact_html, social[], logo (bool), title, preheader, lang_iso, rtl
+     * @param array $extra footer_html, about_html, contact_html, social[], logo (bool), title, preheader, lang_iso, rtl,
+     *                     layout_html (HTML of a custom design), keep_tokens (bool, output for the visual builder)
      *
      * @return string full e-mail HTML
      */
     public static function render($layout, array $s, $content, array $extra = [])
     {
-        $layout = in_array($layout, self::LAYOUTS, true) ? $layout : 'classic';
-        $file = dirname(__DIR__) . '/views/layouts/' . $layout . '.html';
-        $tpl = (string) file_get_contents($file);
+        $layout = self::isValid($layout) ? $layout : 'classic';
+        if (self::isCustom($layout)) {
+            $tpl = isset($extra['layout_html']) ? (string) $extra['layout_html'] : '';
+            if (strpos($tpl, '[[content]]') === false) {
+                // A custom design always needs the content: fall back to a built-in one.
+                $layout = 'modern';
+                $tpl = '';
+            }
+        }
+        if (!self::isCustom($layout)) {
+            $tpl = (string) file_get_contents(dirname(__DIR__) . '/views/layouts/' . $layout . '.html');
+        }
         $s = self::sanitize($layout, $s);
         $font = self::FONTS[$s['font_family']];
 
@@ -215,6 +269,14 @@ class MteDesign
                 $tokens[$key] = is_string($value) ? self::attr($value) : (string) $value;
             }
         }
+        if (!empty($extra['keep_tokens'])) {
+            // Starting point for the visual builder: dynamic parts stay as tokens, each
+            // in its own element so the builder shows them as blocks.
+            foreach (self::BLOCK_TOKENS as $name) {
+                $tokens[$name] = self::tokenBlock($name);
+            }
+            $tpl = preg_replace('/<!--mte:(?:if [a-z_]+|endif)-->/', '', $tpl);
+        }
         // Remove optional blocks whose token was empty: <!--mte:if social-->...<!--mte:endif-->
         $tpl = preg_replace_callback('/<!--mte:if ([a-z_]+)-->(.*?)<!--mte:endif-->/s', function ($m) use ($tokens) {
             return isset($tokens[$m[1]]) && trim(strip_tags($tokens[$m[1]], '<img><a>')) !== '' ? $m[2] : '';
@@ -225,6 +287,42 @@ class MteDesign
         }, $tpl);
 
         return MteContentExtractor::restoreTableVars($tpl);
+    }
+
+    /**
+     * Placeholder element of a token inside a custom design.
+     */
+    public static function tokenBlock($name)
+    {
+        return '<div data-mte-token="' . $name . '">[[' . $name . ']]</div>';
+    }
+
+    /**
+     * Cleans the HTML of a design coming from the visual builder.
+     *
+     * @return string|false false when the [[content]] placeholder is missing
+     */
+    public static function cleanCustomHtml($html, $logoUrl = '')
+    {
+        $html = MteEncoding::toUtf8((string) $html);
+        // The builder shows the real logo; e-mails must use the {shop_logo} variable.
+        if ($logoUrl !== '') {
+            $html = str_replace([$logoUrl, htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8')], '{shop_logo}', $html);
+        }
+        $html = MteContentExtractor::fixVariables($html);
+        $html = preg_replace('#<script\b[^>]*>.*?</script>#is', '', $html);
+        $html = preg_replace('/\son[a-z]+\s*=\s*("[^"]*"|\'[^\']*\')/i', '', $html);
+        if (strpos($html, '[[content]]') === false) {
+            return false;
+        }
+        if (!preg_match('/<html/i', $html)) {
+            $html = "<!DOCTYPE html>\n<html lang=\"[[lang]]\" dir=\"[[dir]]\">\n<head>\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n"
+                . "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n<title>[[title]]</title>\n"
+                . "<style type=\"text/css\">body{margin:0;padding:0;-webkit-text-size-adjust:100%;} img{border:0;max-width:100%;} table{border-collapse:collapse;}</style>\n"
+                . "</head>\n" . (preg_match('/^\s*<body/i', $html) ? $html : "<body style=\"margin:0;padding:0;\">\n" . $html . "\n</body>") . "\n</html>\n";
+        }
+
+        return $html;
     }
 
     /**
