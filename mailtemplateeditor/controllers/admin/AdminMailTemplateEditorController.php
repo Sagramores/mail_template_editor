@@ -43,8 +43,8 @@ class AdminMailTemplateEditorController extends ModuleAdminController
     public function initPageHeaderToolbar()
     {
         parent::initPageHeaderToolbar();
-        $this->page_header_toolbar_title = $this->l('E-mail templates');
-        $this->toolbar_title = [$this->l('E-mail templates')];
+        $this->page_header_toolbar_title = $this->t('E-mail templates');
+        $this->toolbar_title = [$this->t('E-mail templates')];
     }
 
     public function renderView()
@@ -102,34 +102,43 @@ class AdminMailTemplateEditorController extends ModuleAdminController
     {
         // l() returns HTML-escaped strings; the JS inserts them as text.
         return array_map([$this, 'plain'], [
-            'saved' => $this->l('Saved'),
-            'error' => $this->l('Error'),
-            'confirmDelete' => $this->l('Delete the customised version? The original PrestaShop e-mail will be used again.'),
-            'confirmImport' => $this->l('Replace the editor content with the original e-mail content?'),
-            'confirmBulk' => $this->l('Import the original content of every e-mail that is not customised yet, for this language?'),
-            'confirmRestore' => $this->l('Restore this backup? The current file will be backed up first.'),
-            'confirmLeave' => $this->l('You have unsaved changes. Continue?'),
-            'customised' => $this->l('Customised'),
-            'disabled' => $this->l('Disabled'),
-            'notTranslated' => $this->l('No file in this language'),
-            'noTemplate' => $this->l('Select an e-mail from the list.'),
-            'noFile' => $this->l('Select a file from the list.'),
-            'sent' => $this->l('Test e-mail sent'),
-            'imported' => $this->l('Imported'),
-            'noBackups' => $this->l('No backups yet'),
-            'restore' => $this->l('Restore'),
-            'encoding' => $this->l('Detected encoding'),
-            'converted' => $this->l('The file was not UTF-8; it was converted. Saving will store it as UTF-8.'),
-            'repaired' => $this->l('Characters repaired. Check the result and save.'),
-            'nothingToRepair' => $this->l('Nothing to repair.'),
-            'variables' => $this->l('Variables of this e-mail (click to insert)'),
-            'insertButton' => $this->l('Button'),
-            'insertBox' => $this->l('Box'),
-            'buttonText' => $this->l('Button text'),
-            'buttonUrl' => $this->l('Button link (you can use variables, e.g. {shop_url})'),
-            'source' => $this->l('HTML source'),
-            'visual' => $this->l('Visual editor'),
+            'saved' => $this->t('Saved'),
+            'error' => $this->t('Error'),
+            'confirmDelete' => $this->t('Delete the customised version? The original PrestaShop e-mail will be used again.'),
+            'confirmImport' => $this->t('Replace the editor content with the original e-mail content?'),
+            'confirmBulk' => $this->t('Import the original content of every e-mail that is not customised yet, for this language?'),
+            'confirmRestore' => $this->t('Restore this backup? The current file will be backed up first.'),
+            'confirmLeave' => $this->t('You have unsaved changes. Continue?'),
+            'customised' => $this->t('Customised'),
+            'disabled' => $this->t('Disabled'),
+            'notTranslated' => $this->t('No file in this language'),
+            'noTemplate' => $this->t('Select an e-mail from the list.'),
+            'noFile' => $this->t('Select a file from the list.'),
+            'sent' => $this->t('Test e-mail sent'),
+            'imported' => $this->t('Imported'),
+            'noBackups' => $this->t('No backups yet'),
+            'restore' => $this->t('Restore'),
+            'encoding' => $this->t('Detected encoding'),
+            'converted' => $this->t('The file was not UTF-8; it was converted. Saving will store it as UTF-8.'),
+            'repaired' => $this->t('Characters repaired. Check the result and save.'),
+            'nothingToRepair' => $this->t('Nothing to repair.'),
+            'variables' => $this->t('Variables of this e-mail (click to insert)'),
+            'insertButton' => $this->t('Button'),
+            'insertBox' => $this->t('Box'),
+            'buttonText' => $this->t('Button text'),
+            'buttonUrl' => $this->t('Button link (you can use variables, e.g. {shop_url})'),
+            'source' => $this->t('HTML source'),
+            'visual' => $this->t('Visual editor'),
         ]);
+    }
+
+    /**
+     * Translation helper. AdminController::l() no longer exists in PrestaShop 9,
+     * Module::l() works on 1.7, 8 and 9 and reads translations/<iso>.php.
+     */
+    protected function t($string)
+    {
+        return $this->module->l($string, 'AdminMailTemplateEditorController');
     }
 
     protected function plain($text)
@@ -161,7 +170,7 @@ class AdminMailTemplateEditorController extends ModuleAdminController
     protected function requireEdit()
     {
         if (!$this->canEdit()) {
-            $this->fail($this->l('You do not have permission to edit.'));
+            $this->fail($this->t('You do not have permission to edit.'));
         }
     }
 
@@ -181,7 +190,7 @@ class AdminMailTemplateEditorController extends ModuleAdminController
     {
         $value = MteEncoding::decodeTransport($this->raw($name));
         if ($value === false) {
-            $this->fail($this->l('Invalid content received.'));
+            $this->fail($this->t('Invalid content received.'));
         }
 
         return $value;
@@ -193,7 +202,7 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         $template = (string) Tools::getValue('template');
         $idLang = (int) Tools::getValue('id_lang');
         if (!preg_match('/^[a-zA-Z0-9_-]+$/', $module) || !preg_match('/^[a-zA-Z0-9_.-]+$/', $template) || !Language::getLanguage($idLang)) {
-            $this->fail($this->l('Invalid template.'));
+            $this->fail($this->t('Invalid template.'));
         }
 
         return [$module, $template, $idLang, (int) $this->context->shop->id, Language::getIsoById($idLang)];
@@ -249,7 +258,7 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         list($module, $template, , , $iso) = $this->templateParams();
         $html = $this->originalHtml($module, $template, $iso);
         if ($html === '') {
-            $this->fail($this->l('Original template not found.'));
+            $this->fail($this->t('Original template not found.'));
         }
         $this->json(['content' => MteContentExtractor::extract($html, (bool) Tools::getValue('normalize', 1))]);
     }
@@ -261,7 +270,7 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         $content = $this->content('content');
         $subject = MteEncoding::toUtf8($this->raw('subject'));
         if (trim(strip_tags($content, '<img>')) === '') {
-            $this->fail($this->l('The content is empty.'));
+            $this->fail($this->t('The content is empty.'));
         }
         if (!MteRepository::save($idShop, $idLang, $module, $template, $subject, $content, (bool) Tools::getValue('active'))) {
             $this->fail(Db::getInstance()->getMsgError());
@@ -283,7 +292,7 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         $idLang = (int) Tools::getValue('id_lang');
         $iso = Language::getIsoById($idLang);
         if (!$iso) {
-            $this->fail($this->l('Invalid language.'));
+            $this->fail($this->t('Invalid language.'));
         }
         $idShop = (int) $this->context->shop->id;
         $status = MteRepository::status($idShop, $idLang);
@@ -320,7 +329,7 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         $layout = (string) Tools::getValue('layout');
         if (!in_array($layout, MteDesign::LAYOUTS, true)) {
             if ($strict) {
-                $this->fail($this->l('Invalid design.'));
+                $this->fail($this->t('Invalid design.'));
             }
 
             return null;
@@ -390,11 +399,11 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         list($module, $template, $idLang, $idShop, $iso) = $this->templateParams();
         $email = (string) Tools::getValue('email');
         if (!Validate::isEmail($email)) {
-            $this->fail($this->l('Invalid e-mail address.'));
+            $this->fail($this->t('Invalid e-mail address.'));
         }
         $path = $module === 'core' ? _PS_MAIL_DIR_ : _PS_MODULE_DIR_ . $module . '/mails/';
         if (!$this->scanner->resolve($module, $template, $iso, 'html')) {
-            $this->fail($this->l('This e-mail has no file for this language, PrestaShop cannot send it.'));
+            $this->fail($this->t('This e-mail has no file for this language, PrestaShop cannot send it.'));
         }
         $vars = [];
         foreach ($this->sampleVars($idLang) as $k => $v) {
@@ -403,7 +412,7 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         $subject = '[TEST] ' . $template;
         $ok = Mail::send($idLang, $template, $subject, $vars, $email, null, null, null, null, null, $path, false, $idShop);
         if (!$ok) {
-            $this->fail($this->l('PrestaShop could not send the e-mail. Check Advanced Parameters > E-mail and the logs.'));
+            $this->fail($this->t('PrestaShop could not send the e-mail. Check Advanced Parameters > E-mail and the logs.'));
         }
         $this->json([]);
     }
@@ -422,7 +431,7 @@ class AdminMailTemplateEditorController extends ModuleAdminController
     {
         $abs = $this->scanner->securePath($this->raw('path'));
         if (!$abs) {
-            $this->fail($this->l('Invalid file.'));
+            $this->fail($this->t('Invalid file.'));
         }
 
         return $abs;
@@ -446,13 +455,13 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         $abs = $this->securePath();
         $content = $this->content('content');
         if (!is_writable($abs)) {
-            $this->fail($this->l('The file is not writable.'));
+            $this->fail($this->t('The file is not writable.'));
         }
         if (!$this->backup($abs)) {
-            $this->fail($this->l('Could not create a backup; the file was not saved.'));
+            $this->fail($this->t('Could not create a backup; the file was not saved.'));
         }
         if (!MteEncoding::writeFile($abs, $content)) {
-            $this->fail($this->l('Could not write the file.'));
+            $this->fail($this->t('Could not write the file.'));
         }
         $this->json(['backups' => $this->backups($abs)]);
     }
@@ -464,12 +473,12 @@ class AdminMailTemplateEditorController extends ModuleAdminController
         $name = basename((string) Tools::getValue('backup'));
         $file = $this->backupDir($abs) . $name;
         if (!preg_match('/^[0-9_]+\.bak$/', $name) || !is_file($file)) {
-            $this->fail($this->l('Backup not found.'));
+            $this->fail($this->t('Backup not found.'));
         }
         $content = file_get_contents($file);
         $this->backup($abs);
         if (!MteEncoding::writeFile($abs, $content)) {
-            $this->fail($this->l('Could not write the file.'));
+            $this->fail($this->t('Could not write the file.'));
         }
         $this->json(['content' => MteEncoding::toUtf8($content), 'backups' => $this->backups($abs)]);
     }
